@@ -1,0 +1,7 @@
+# devcontainer 镜像构建上下文排除项：
+# libgphoto2-android 由工作区挂载提供，无需进入镜像层
+libgphoto2-android/
+
+# 排除版本控制与构建产物
+.git/
+bin/

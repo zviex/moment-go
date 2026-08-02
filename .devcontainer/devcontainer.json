@@ -1,0 +1,35 @@
+{
+  "name": "moment-go (Go + Android NDK)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "..",
+    "args": {
+      "GO_VERSION": "1.26.1",
+      "NDK_VERSION": "r27d",
+      "ANDROID_API_LEVEL": "27"
+    }
+  },
+  "remoteEnv": {
+    "ANDROID_NDK_HOME": "/opt/android-ndk",
+    "ANDROID_NDK_ROOT": "/opt/android-ndk",
+    "ANDROID_HOME": "/opt/android-sdk",
+    "ANDROID_API_LEVEL": "27",
+    "PATH": "${containerEnv:PATH}:/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+  },
+  "postCreateCommand": "cd /workspaces/moment-go && go version && $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android$ANDROID_API_LEVEL-clang --version && go build ./... && go test ./... && bash .devcontainer/build-android.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.Go"
+      ],
+      "settings": {
+        "go.useLanguageServer": true,
+        "gopls": {
+          "env": {
+            "CGO_ENABLED": "0"
+          }
+        }
+      }
+    }
+  }
+}
