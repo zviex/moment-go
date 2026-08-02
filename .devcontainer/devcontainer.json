@@ -6,17 +6,20 @@
     "args": {
       "GO_VERSION": "1.26.1",
       "NDK_VERSION": "r27d",
-      "ANDROID_API_LEVEL": "27"
+      "ANDROID_API_LEVEL": "27",
+      "GOPROXY": "https://goproxy.cn,direct"
     }
   },
   "remoteEnv": {
+    "GOPROXY": "https://goproxy.cn,direct",
+    "CGO_ENABLED": "1",
     "ANDROID_NDK_HOME": "/opt/android-ndk",
     "ANDROID_NDK_ROOT": "/opt/android-ndk",
     "ANDROID_HOME": "/opt/android-sdk",
     "ANDROID_API_LEVEL": "27",
     "PATH": "${containerEnv:PATH}:/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
   },
-  "postCreateCommand": "cd /workspaces/moment-go && go version && $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android$ANDROID_API_LEVEL-clang --version && go build ./... && go test ./... && bash .devcontainer/build-android.sh",
+  "postCreateCommand": "cd /workspaces/moment-go && go version && echo \"cgo=$(go env CGO_ENABLED) proxy=$(go env GOPROXY)\" && $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android$ANDROID_API_LEVEL-clang --version && go build ./... && go test ./... && bash .devcontainer/build-android.sh",
   "customizations": {
     "vscode": {
       "extensions": [
