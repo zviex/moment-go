@@ -1,0 +1,5 @@
+# libgphoto2 预编译后端（体积大，不入库；由外部提供）
+libgphoto2-android/
+
+# 交叉编译产物
+bin/
