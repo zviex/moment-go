@@ -3,12 +3,8 @@
 package gphoto2
 
 /*
+#include <stdlib.h>
 #include <gphoto2/gphoto2-context.h>
-
-// 桥接声明：由 cgo 的 //export 生成，C 侧仅需声明。
-extern void GPhoto2ErrorCallback(GPContext *context, const char *text, void *data);
-extern void GPhoto2StatusCallback(GPContext *context, const char *text, void *data);
-extern void GPhoto2MessageCallback(GPContext *context, const char *text, void *data);
 */
 import "C"
 
@@ -58,9 +54,13 @@ func newGPContext(h *contextHandlers) (*C.GPContext, unsafe.Pointer) {
 		unregisterContext(id, idPtr)
 		return nil, nil
 	}
-	C.gp_context_set_error_func(ctx, C.GPContextErrorFunc(C.GPhoto2ErrorCallback), idPtr)
-	C.gp_context_set_status_func(ctx, C.GPContextStatusFunc(C.GPhoto2StatusCallback), idPtr)
-	C.gp_context_set_message_func(ctx, C.GPContextMessageFunc(C.GPhoto2MessageCallback), idPtr)
+	// Keep the libgphoto2 context alive without registering Go callback hooks.
+	// The Android binary does not require context callbacks during normal camera operations,
+	// and avoiding exported C->Go callback functions is the most reliable path for cgo
+	// under the Android NDK cross toolchain.
+	C.gp_context_set_error_func(ctx, nil, nil)
+	C.gp_context_set_status_func(ctx, nil, nil)
+	C.gp_context_set_message_func(ctx, nil, nil)
 	return ctx, idPtr
 }
 
@@ -96,31 +96,4 @@ func dispatch(data unsafe.Pointer, invoke func(*contextHandlers)) {
 	if ok && h != nil {
 		invoke(h)
 	}
-}
-
-//export GPhoto2ErrorCallback
-func GPhoto2ErrorCallback(_ *C.GPContext, text *C.char, data unsafe.Pointer) {
-	dispatch(data, func(h *contextHandlers) {
-		if h.errorFunc != nil {
-			h.errorFunc(C.GoString(text))
-		}
-	})
-}
-
-//export GPhoto2StatusCallback
-func GPhoto2StatusCallback(_ *C.GPContext, text *C.char, data unsafe.Pointer) {
-	dispatch(data, func(h *contextHandlers) {
-		if h.statusFunc != nil {
-			h.statusFunc(C.GoString(text))
-		}
-	})
-}
-
-//export GPhoto2MessageCallback
-func GPhoto2MessageCallback(_ *C.GPContext, text *C.char, data unsafe.Pointer) {
-	dispatch(data, func(h *contextHandlers) {
-		if h.messageFunc != nil {
-			h.messageFunc(C.GoString(text))
-		}
-	})
 }

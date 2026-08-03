@@ -2,6 +2,31 @@
 
 package gphoto2
 
+/*
+#cgo CFLAGS: -I${SRCDIR}/../../../libgphoto2-android/include
+#cgo LDFLAGS: -L${SRCDIR}/../../../libgphoto2-android/lib -lgphoto2 -lgphoto2_port -lltdl -lm
+
+#include <gphoto2/gphoto2.h>
+#include <gphoto2/gphoto2-camera.h>
+#include <gphoto2/gphoto2-context.h>
+#include <gphoto2/gphoto2-filesys.h>
+#include <gphoto2/gphoto2-file.h>
+#include <gphoto2/gphoto2-list.h>
+#include <gphoto2/gphoto2-abilities-list.h>
+#include <gphoto2/gphoto2-port-info-list.h>
+#include <gphoto2/gphoto2-result.h>
+#include <gphoto2/gphoto2-widget.h>
+#include <stdlib.h>
+#include <string.h>
+
+static void gp_file_info_mime(const CameraFileInfo *info, char *buf, size_t bufsize) {
+	if (!info || !buf || bufsize <= 0) return;
+	strncpy(buf, info->file.type, bufsize - 1);
+	buf[bufsize - 1] = '\0';
+}
+*/
+import "C"
+
 import (
 	"context"
 	"errors"
@@ -16,9 +41,6 @@ import (
 	"ci.zevix.uk/moment-go/internal/domain"
 	"ci.zevix.uk/moment-go/internal/logging"
 )
-
-// 本文件依赖 cgo（C.gp_* API）,通过同包的 bindings.go 提供 C 前导.
-import "C"
 
 // 文件信息字段位掩码（gphoto2-filesys.h）。
 const (
@@ -271,7 +293,7 @@ func (g *Gateway) lookupPort(portPath string) (C.GPPortInfo, error) {
 	portC := C.CString(portPath)
 	defer C.free(unsafe.Pointer(portC))
 
-	idx := int(C.gp_port_info_list_lookup_path(pl, portC))
+	idx := C.gp_port_info_list_lookup_path(pl, portC)
 	if idx < 0 {
 		return nil, fmt.Errorf("port %q not found", portPath)
 	}
@@ -303,7 +325,7 @@ func (g *Gateway) lookupAbilities(model string) (C.CameraAbilities, error) {
 	}
 	modelC := C.CString(model)
 	defer C.free(unsafe.Pointer(modelC))
-	idx := int(C.gp_abilities_list_lookup_model(al, modelC))
+	idx := C.gp_abilities_list_lookup_model(al, modelC)
 	if idx < 0 {
 		return C.CameraAbilities{}, fmt.Errorf("%w: %q", domain.ErrModelNotFound, model)
 	}
