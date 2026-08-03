@@ -17,7 +17,7 @@ import (
 	"ci.zevix.uk/moment-go/internal/logging"
 )
 
-// 本文件依赖 cgo（C.gp_* API），通过同包的 bindings.go 提供 C 前导。
+// 本文件依赖 cgo（C.gp_* API）,通过同包的 bindings.go 提供 C 前导.
 import "C"
 
 // 文件信息字段位掩码（gphoto2-filesys.h）。
