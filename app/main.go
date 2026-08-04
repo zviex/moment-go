@@ -15,6 +15,7 @@ import (
 	"os"
 
 	"ci.zevix.uk/moment-go/pkg/moment"
+	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
 )
 
 func main() {
@@ -29,7 +30,7 @@ func main() {
 
 	// 2. 连接：PTP/IP 网络连接（相机 WiFi/IP 模式）。
 	cam, err := client.Connect(ctx, moment.ConnectOptions{
-		Type: moment.ConnectPTPIP,
+		Type: connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP,
 		Host: "192.168.1.100",
 	})
 	if err != nil {

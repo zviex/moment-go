@@ -9,6 +9,7 @@ import (
 
 	"ci.zevix.uk/moment-go/internal/domain"
 	"ci.zevix.uk/moment-go/internal/logging"
+	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
 )
 
 // ---- 内存假后端，用于在无硬件环境验证用例编排 ----
@@ -131,7 +132,7 @@ func TestConnectLifecycle(t *testing.T) {
 	app := newTestApp()
 	ctx := context.Background()
 
-	sess, err := app.Connect(ctx, domain.ConnectOptions{Type: domain.ConnectAuto})
+	sess, err := app.Connect(ctx, domain.ConnectOptions{Type: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO})
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
@@ -143,7 +144,7 @@ func TestConnectLifecycle(t *testing.T) {
 	}
 
 	// 重复连接应报错。
-	if _, err := app.Connect(ctx, domain.ConnectOptions{Type: domain.ConnectAuto}); err == nil {
+	if _, err := app.Connect(ctx, domain.ConnectOptions{Type: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO}); err == nil {
 		t.Fatal("second connect should fail")
 	}
 
@@ -177,7 +178,7 @@ func TestOperationsRequireConnection(t *testing.T) {
 func TestListTreeWalksAllFolders(t *testing.T) {
 	app := newTestApp()
 	ctx := context.Background()
-	if _, err := app.Connect(ctx, domain.ConnectOptions{Type: domain.ConnectAuto}); err != nil {
+	if _, err := app.Connect(ctx, domain.ConnectOptions{Type: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO}); err != nil {
 		t.Fatal(err)
 	}
 	defer app.Disconnect(ctx)
@@ -203,7 +204,7 @@ func TestListTreeWalksAllFolders(t *testing.T) {
 func TestDownloadRoundTrip(t *testing.T) {
 	app := newTestApp()
 	ctx := context.Background()
-	if _, err := app.Connect(ctx, domain.ConnectOptions{Type: domain.ConnectAuto}); err != nil {
+	if _, err := app.Connect(ctx, domain.ConnectOptions{Type: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO}); err != nil {
 		t.Fatal(err)
 	}
 	defer app.Disconnect(ctx)
@@ -228,7 +229,7 @@ func TestDownloadRoundTrip(t *testing.T) {
 func TestGetInfo(t *testing.T) {
 	app := newTestApp()
 	ctx := context.Background()
-	if _, err := app.Connect(ctx, domain.ConnectOptions{Type: domain.ConnectAuto}); err != nil {
+	if _, err := app.Connect(ctx, domain.ConnectOptions{Type: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO}); err != nil {
 		t.Fatal(err)
 	}
 	defer app.Disconnect(ctx)
@@ -246,7 +247,7 @@ func TestConnectTimeout(t *testing.T) {
 	app := newTestApp()
 	ctx := context.Background()
 	// 超时极短，验证超时包装路径可用。
-	opts := domain.ConnectOptions{Type: domain.ConnectAuto, Timeout: time.Nanosecond}
+	opts := domain.ConnectOptions{Type: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO, Timeout: time.Nanosecond}
 	_, err := app.Connect(ctx, opts)
 	if err == nil {
 		t.Fatal("expected timeout/cancel error")

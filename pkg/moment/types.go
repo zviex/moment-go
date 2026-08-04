@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ci.zevix.uk/moment-go/internal/domain"
+	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
 )
 
 // 公共错误哨兵：供调用方做错误分类。
@@ -34,22 +35,22 @@ var (
 // IsUnsupported 判断错误是否为“后端在当前平台不可用”。
 func IsUnsupported(err error) bool { return errors.Is(err, ErrUnsupportedPlatform) }
 
-// ConnectionType 是连接方式。
-type ConnectionType int
+// // ConnectionType 是连接方式。
+// type ConnectionType int
 
-const (
-	// ConnectAuto 自动探测（USB 相机，取第一个结果）。
-	ConnectAuto ConnectionType = iota
-	// ConnectUSB 通过 USB 端口连接。
-	ConnectUSB
-	// ConnectPTPIP 通过 PTP/IP 网络协议连接。
-	ConnectPTPIP
-)
+// const (
+// 	// ConnectAuto 自动探测（USB 相机，取第一个结果）。
+// 	ConnectAuto ConnectionType = iota
+// 	// ConnectUSB 通过 USB 端口连接。
+// 	ConnectUSB
+// 	// ConnectPTPIP 通过 PTP/IP 网络协议连接。
+// 	ConnectPTPIP
+// )
 
 // ConnectOptions 是连接参数。
 type ConnectOptions struct {
 	// Type 连接方式，默认 ConnectPTPIP 之外的语义见各字段。
-	Type ConnectionType
+	Type connectionv1.ConnectionMode
 	// Model 相机模型名；PTP/IP 缺省为 "PTP/IP Camera"。
 	Model string
 	// Host PTP/IP 相机地址（IP 或主机名）。
@@ -159,7 +160,7 @@ func (s State) String() string { return domain.State(s).String() }
 
 func toDomainOptions(o ConnectOptions) domain.ConnectOptions {
 	return domain.ConnectOptions{
-		Type:    domain.ConnectionType(o.Type),
+		Type:    connectionv1.ConnectionMode(o.Type),
 		Model:   o.Model,
 		Host:    o.Host,
 		Port:    o.Port,

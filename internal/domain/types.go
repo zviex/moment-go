@@ -1,36 +1,40 @@
 // Package domain 是整洁架构的最内层：领域实体与领域服务，不依赖任何外部实现。
 package domain
 
-import "time"
+import (
+	"time"
 
-// ConnectionType 描述与相机的连接方式。
-type ConnectionType int
-
-const (
-	// ConnectAuto 自动探测（USB 相机自动检测，取第一个结果）。
-	ConnectAuto ConnectionType = iota
-	// ConnectUSB 通过指定 USB 端口连接（形如 "usb:bus,dev" 或 "usb:vid,pid"）。
-	ConnectUSB
-	// ConnectPTPIP 通过 PTP/IP 网络协议连接相机。
-	ConnectPTPIP
+	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
 )
 
-func (t ConnectionType) String() string {
-	switch t {
-	case ConnectAuto:
-		return "auto"
-	case ConnectUSB:
-		return "usb"
-	case ConnectPTPIP:
-		return "ptpip"
-	default:
-		return "unknown"
-	}
-}
+// // ConnectionType 描述与相机的连接方式。
+// type ConnectionType int
+
+// const (
+// 	// ConnectAuto 自动探测（USB 相机自动检测，取第一个结果）。
+// 	ConnectAuto ConnectionType = iota
+// 	// ConnectUSB 通过指定 USB 端口连接（形如 "usb:bus,dev" 或 "usb:vid,pid"）。
+// 	ConnectUSB
+// 	// ConnectPTPIP 通过 PTP/IP 网络协议连接相机。
+// 	ConnectPTPIP
+// )
+
+// func (t ConnectionType) String() string {
+// 	switch t {
+// 	case ConnectAuto:
+// 		return "auto"
+// 	case ConnectUSB:
+// 		return "usb"
+// 	case ConnectPTPIP:
+// 		return "ptpip"
+// 	default:
+// 		return "unknown"
+// 	}
+// }
 
 // ConnectOptions 是建立相机连接所需的最小参数集。
 type ConnectOptions struct {
-	Type ConnectionType
+	Type connectionv1.ConnectionMode
 	// Model 指定相机模型（能力表中的模型名）。
 	// PTP/IP 时缺省为 "PTP/IP Camera"；USB 时缺省为自动探测到的模型。
 	Model string
