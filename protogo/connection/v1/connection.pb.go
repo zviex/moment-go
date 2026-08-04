@@ -223,10 +223,8 @@ func (x *ConnectCameraRequest) GetPortPath() string {
 
 type ConnectCameraResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	Model         string                 `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"` // model of camera
-	Port          string                 `protobuf:"bytes,3,opt,name=port,proto3" json:"port,omitempty"`
-	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	Model         string                 `protobuf:"bytes,1,opt,name=model,proto3" json:"model,omitempty"` // model of camera
+	Port          string                 `protobuf:"bytes,2,opt,name=port,proto3" json:"port,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -261,13 +259,6 @@ func (*ConnectCameraResponse) Descriptor() ([]byte, []int) {
 	return file_connection_v1_connection_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *ConnectCameraResponse) GetSuccess() bool {
-	if x != nil {
-		return x.Success
-	}
-	return false
-}
-
 func (x *ConnectCameraResponse) GetModel() string {
 	if x != nil {
 		return x.Model
@@ -278,13 +269,6 @@ func (x *ConnectCameraResponse) GetModel() string {
 func (x *ConnectCameraResponse) GetPort() string {
 	if x != nil {
 		return x.Port
-	}
-	return ""
-}
-
-func (x *ConnectCameraResponse) GetErrorMessage() string {
-	if x != nil {
-		return x.ErrorMessage
 	}
 	return ""
 }
@@ -301,12 +285,10 @@ const file_connection_v1_connection_proto_rawDesc = "" +
 	"\x04mode\x18\x01 \x01(\x0e2\x1d.connection.v1.ConnectionModeR\x04mode\x12\"\n" +
 	"\rusb_vendor_id\x18\x02 \x01(\rR\vusbVendorId\x12$\n" +
 	"\x0eusb_product_id\x18\x03 \x01(\rR\fusbProductId\x12\x1b\n" +
-	"\tport_path\x18\x04 \x01(\tR\bportPath\"\x80\x01\n" +
-	"\x15ConnectCameraResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
-	"\x05model\x18\x02 \x01(\tR\x05model\x12\x12\n" +
-	"\x04port\x18\x03 \x01(\tR\x04port\x12#\n" +
-	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage*\x7f\n" +
+	"\tport_path\x18\x04 \x01(\tR\bportPath\"A\n" +
+	"\x15ConnectCameraResponse\x12\x14\n" +
+	"\x05model\x18\x01 \x01(\tR\x05model\x12\x12\n" +
+	"\x04port\x18\x02 \x01(\tR\x04port*\x7f\n" +
 	"\x0eConnectionMode\x12\x1f\n" +
 	"\x1bCONNECTION_MODE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14CONNECTION_MODE_AUTO\x10\x01\x12\x17\n" +
