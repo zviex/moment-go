@@ -1,4 +1,4 @@
-package service
+package camera
 
 import camerav1 "ci.zevix.uk/moment-go/protogo/camera/v1"
 

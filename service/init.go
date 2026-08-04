@@ -1,10 +1,11 @@
 package service
 
 import (
-	"ci.zevix.uk/moment-go/pkg/registry"
-	camerav1 "ci.zevix.uk/moment-go/protogo/camera/v1"
+	"ci.zevix.uk/moment-go/service/camera"
+	"ci.zevix.uk/moment-go/service/connection"
 )
 
 func Init() {
-	registry.Register(camerav1.CameraService_ServiceDesc, cameraService{})
+	camera.Init()
+	connection.Init()
 }
