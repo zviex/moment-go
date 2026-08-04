@@ -20,10 +20,19 @@ func (connService) InitlizeCamera(ctx context.Context, req *connectionv1.Initliz
 }
 
 func (connService) ConnectCamera(ctx context.Context, req *connectionv1.ConnectCameraRequest) (*connectionv1.ConnectCameraResponse, error) {
+	// 当前端退出，但是后端保持活性，还存在连接实例则直接返回
 	cam, err := connect.Open(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	camera.SetDefault(cam)
-	return nil, nil
+
+	c := camera.Default()
+
+	resp := connectionv1.ConnectCameraResponse{
+		Model: c.Model(),
+		Port:  c.PortPath(),
+	}
+
+	return &resp, nil
 }
