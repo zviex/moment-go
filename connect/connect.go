@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"ci.zevix.uk/moment-go/pkg/moment"
-	"ci.zevix.uk/moment-go/pool/camera"
+	"ci.zevix.uk/moment-go/pool/client"
 	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
 )
 
@@ -18,21 +18,22 @@ type Connecter interface {
 func Open(ctx context.Context, req *connectionv1.ConnectCameraRequest) (*moment.Camera, error) {
 	// 当前端退出，但是后端保持活性，还存在连接实例则直接返回
 
-	if cam := camera.Default(); cam != nil {
-		return cam, nil
+	cl := client.Default()
+	if cl != nil {
+		return cl.Camera()
 	}
 
-	client, err := moment.New(moment.WithVerboseLog(true))
+	cl, err := moment.New(moment.WithVerboseLog(true))
 	if err != nil {
 		return nil, err
 	}
 
-	cam, err := client.Connect(ctx, factory[req.Mode].connect(req))
+	cam, err := cl.Connect(ctx, factory[req.Mode].connect(req))
 	if err != nil {
 		return nil, err
 	}
 
-	camera.SetDefault(cam)
+	client.SetDefault(cl)
 
 	return cam, nil
 }

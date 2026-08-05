@@ -53,9 +53,10 @@ func (a *CameraApp) Detect(ctx context.Context) ([]domain.DetectedCamera, error)
 }
 
 // Connect 建立相机连接。成功后将生命周期切换到 Connected。
+// 若当前已有已连接的会话，则直接复用该实例，不重复打开连接。
 func (a *CameraApp) Connect(ctx context.Context, opts domain.ConnectOptions) (domain.CameraSession, error) {
 	if a.IsConnected() {
-		return nil, domain.ErrAlreadyConnected
+		return a.session, nil
 	}
 	if err := a.lifecycle.transition(domain.StateDisconnected, domain.StateConnecting); err != nil {
 		return nil, err

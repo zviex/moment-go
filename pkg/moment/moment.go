@@ -51,7 +51,17 @@ func (c *Client) Detect(ctx context.Context) ([]DetectedCamera, error) {
 	return toDetected(cams), nil
 }
 
+// Camera 返回当前已连接会话对应的 Camera 实例；如果当前未连接则返回 ErrNotConnected。
+func (c *Client) Camera() (*Camera, error) {
+	sess, err := c.app.Session()
+	if err != nil {
+		return nil, err
+	}
+	return &Camera{app: c.app, sess: sess}, nil
+}
+
 // Connect 建立相机连接，成功时返回 *Camera（生命周期进入 Connected）。
+// 若客户端已连接，则直接返回当前 Camera 实例，不重复建立新连接。
 //
 //	// PTP/IP 网络连接：
 //	cam, err := client.Connect(ctx, moment.ConnectOptions{
@@ -62,6 +72,9 @@ func (c *Client) Detect(ctx context.Context) ([]DetectedCamera, error) {
 //	// USB 自动探测：
 //	cam, err := client.Connect(ctx, moment.ConnectOptions{Type: moment.ConnectAuto})
 func (c *Client) Connect(ctx context.Context, opts ConnectOptions) (*Camera, error) {
+	if c.IsConnected() {
+		return c.Camera()
+	}
 	sess, err := c.app.Connect(ctx, toDomainOptions(opts))
 	if err != nil {
 		return nil, err
