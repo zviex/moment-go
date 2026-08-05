@@ -143,9 +143,13 @@ func TestConnectLifecycle(t *testing.T) {
 		t.Fatal("expected connected")
 	}
 
-	// 重复连接应报错。
-	if _, err := app.Connect(ctx, domain.ConnectOptions{Type: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO}); err == nil {
-		t.Fatal("second connect should fail")
+	// 重复连接应返回当前 session，而不是新建连接。
+	same, err := app.Connect(ctx, domain.ConnectOptions{Type: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO})
+	if err != nil {
+		t.Fatalf("second connect should reuse current session: %v", err)
+	}
+	if same != sess {
+		t.Fatal("second connect should return the same connected session")
 	}
 
 	if err := app.Disconnect(ctx); err != nil {
