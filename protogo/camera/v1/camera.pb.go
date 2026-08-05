@@ -755,17 +755,17 @@ func (FileType) EnumDescriptor() ([]byte, []int) {
 }
 
 type CameraSummary struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Manufacturer    string                 `protobuf:"bytes,1,opt,name=manufacturer,proto3" json:"manufacturer,omitempty"`                              // 制造商，如 "Nikon Corporation"
-	Model           string                 `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`                                            // 型号，如 "Z 30"
-	FirmwareVersion string                 `protobuf:"bytes,3,opt,name=firmware_version,json=firmwareVersion,proto3" json:"firmware_version,omitempty"` // 固件版本，如 "V1.20"
-	SerialNumber    string                 `protobuf:"bytes,4,opt,name=serial_number,json=serialNumber,proto3" json:"serial_number,omitempty"`          // 序列号
-	VendorExtension string                 `protobuf:"bytes,5,opt,name=vendor_extension,json=vendorExtension,proto3" json:"vendor_extension,omitempty"` // 厂商扩展 ID / 描述
-	Capabilities    []string               `protobuf:"bytes,6,rep,name=capabilities,proto3" json:"capabilities,omitempty"`                              // 相机能力列表
-	CaptureFormats  []string               `protobuf:"bytes,7,rep,name=capture_formats,json=captureFormats,proto3" json:"capture_formats,omitempty"`    // 支持的拍摄格式
-	DisplayFormats  []string               `protobuf:"bytes,8,rep,name=display_formats,json=displayFormats,proto3" json:"display_formats,omitempty"`    // 支持的显示格式
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Model         string                 `protobuf:"bytes,1,opt,name=model,proto3" json:"model,omitempty"`
+	Driver        string                 `protobuf:"bytes,2,opt,name=driver,proto3" json:"driver,omitempty"`
+	PortPath      string                 `protobuf:"bytes,3,opt,name=port_path,json=portPath,proto3" json:"port_path,omitempty"`
+	Summary       string                 `protobuf:"bytes,4,opt,name=summary,proto3" json:"summary,omitempty"`
+	About         string                 `protobuf:"bytes,5,opt,name=about,proto3" json:"about,omitempty"`
+	Manual        string                 `protobuf:"bytes,6,opt,name=manual,proto3" json:"manual,omitempty"`
+	Storage       *StorageInfo           `protobuf:"bytes,7,opt,name=storage,proto3" json:"storage,omitempty"`
+	Config        string                 `protobuf:"bytes,8,opt,name=config,proto3" json:"config,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CameraSummary) Reset() {
@@ -798,13 +798,6 @@ func (*CameraSummary) Descriptor() ([]byte, []int) {
 	return file_camera_v1_camera_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *CameraSummary) GetManufacturer() string {
-	if x != nil {
-		return x.Manufacturer
-	}
-	return ""
-}
-
 func (x *CameraSummary) GetModel() string {
 	if x != nil {
 		return x.Model
@@ -812,46 +805,53 @@ func (x *CameraSummary) GetModel() string {
 	return ""
 }
 
-func (x *CameraSummary) GetFirmwareVersion() string {
+func (x *CameraSummary) GetDriver() string {
 	if x != nil {
-		return x.FirmwareVersion
+		return x.Driver
 	}
 	return ""
 }
 
-func (x *CameraSummary) GetSerialNumber() string {
+func (x *CameraSummary) GetPortPath() string {
 	if x != nil {
-		return x.SerialNumber
+		return x.PortPath
 	}
 	return ""
 }
 
-func (x *CameraSummary) GetVendorExtension() string {
+func (x *CameraSummary) GetSummary() string {
 	if x != nil {
-		return x.VendorExtension
+		return x.Summary
 	}
 	return ""
 }
 
-func (x *CameraSummary) GetCapabilities() []string {
+func (x *CameraSummary) GetAbout() string {
 	if x != nil {
-		return x.Capabilities
+		return x.About
+	}
+	return ""
+}
+
+func (x *CameraSummary) GetManual() string {
+	if x != nil {
+		return x.Manual
+	}
+	return ""
+}
+
+func (x *CameraSummary) GetStorage() *StorageInfo {
+	if x != nil {
+		return x.Storage
 	}
 	return nil
 }
 
-func (x *CameraSummary) GetCaptureFormats() []string {
+func (x *CameraSummary) GetConfig() string {
 	if x != nil {
-		return x.CaptureFormats
+		return x.Config
 	}
-	return nil
-}
-
-func (x *CameraSummary) GetDisplayFormats() []string {
-	if x != nil {
-		return x.DisplayFormats
-	}
-	return nil
+	return ""
 }
 
 type CameraAbilities struct {
@@ -1012,16 +1012,12 @@ func (x *CameraAbilities) GetDeviceType() DeviceType {
 
 type StorageInfo struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                                // 内部 ID，如 "store_00010001"
-	Basedir        string                 `protobuf:"bytes,2,opt,name=basedir,proto3" json:"basedir,omitempty"`                                      // 根目录路径
-	Label          string                 `protobuf:"bytes,3,opt,name=label,proto3" json:"label,omitempty"`                                          // 卷标
-	Description    string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`                              // 描述文本
-	Type           StorageType            `protobuf:"varint,5,opt,name=type,proto3,enum=camera.v1.StorageType" json:"type,omitempty"`                // 存储类型
-	Fs             StorageFilesystemType  `protobuf:"varint,6,opt,name=fs,proto3,enum=camera.v1.StorageFilesystemType" json:"fs,omitempty"`          // 文件系统类型
-	Access         StorageAccessType      `protobuf:"varint,7,opt,name=access,proto3,enum=camera.v1.StorageAccessType" json:"access,omitempty"`      // 访问权限
-	CapacityKbytes uint64                 `protobuf:"varint,8,opt,name=capacity_kbytes,json=capacityKbytes,proto3" json:"capacity_kbytes,omitempty"` // 总容量 (KB)
-	FreeKbytes     uint64                 `protobuf:"varint,9,opt,name=free_kbytes,json=freeKbytes,proto3" json:"free_kbytes,omitempty"`             // 剩余空间 (KB)
-	FreeImages     uint64                 `protobuf:"varint,10,opt,name=free_images,json=freeImages,proto3" json:"free_images,omitempty"`            // 可拍照片数（估算）
+	Basedir        string                 `protobuf:"bytes,1,opt,name=basedir,proto3" json:"basedir,omitempty"`                                      // 根目录路径
+	Label          string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`                                          // 卷标
+	Description    string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`                              // 描述文本
+	CapacityKbytes uint64                 `protobuf:"varint,4,opt,name=capacity_kbytes,json=capacityKbytes,proto3" json:"capacity_kbytes,omitempty"` // 总容量 (KB)
+	FreeKbytes     uint64                 `protobuf:"varint,5,opt,name=free_kbytes,json=freeKbytes,proto3" json:"free_kbytes,omitempty"`             // 剩余空间 (KB)
+	FreeImages     uint64                 `protobuf:"varint,6,opt,name=free_images,json=freeImages,proto3" json:"free_images,omitempty"`             // 可拍照片数（估算）
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1056,13 +1052,6 @@ func (*StorageInfo) Descriptor() ([]byte, []int) {
 	return file_camera_v1_camera_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *StorageInfo) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
 func (x *StorageInfo) GetBasedir() string {
 	if x != nil {
 		return x.Basedir
@@ -1082,27 +1071,6 @@ func (x *StorageInfo) GetDescription() string {
 		return x.Description
 	}
 	return ""
-}
-
-func (x *StorageInfo) GetType() StorageType {
-	if x != nil {
-		return x.Type
-	}
-	return StorageType_STORAGE_TYPE_UNSPECIFIED
-}
-
-func (x *StorageInfo) GetFs() StorageFilesystemType {
-	if x != nil {
-		return x.Fs
-	}
-	return StorageFilesystemType_STORAGE_FILESYSTEM_TYPE_UNSPECIFIED
-}
-
-func (x *StorageInfo) GetAccess() StorageAccessType {
-	if x != nil {
-		return x.Access
-	}
-	return StorageAccessType_STORAGE_ACCESS_TYPE_UNSPECIFIED
 }
 
 func (x *StorageInfo) GetCapacityKbytes() uint64 {
@@ -1436,8 +1404,7 @@ func (*GetSummaryRequest) Descriptor() ([]byte, []int) {
 
 type GetSummaryResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RawText       string                 `protobuf:"bytes,1,opt,name=raw_text,json=rawText,proto3" json:"raw_text,omitempty"` // 原始文本（CameraText）
-	Parsed        *CameraSummary         `protobuf:"bytes,2,opt,name=parsed,proto3" json:"parsed,omitempty"`                  // 解析后的结构化数据
+	Parsed        *CameraSummary         `protobuf:"bytes,2,opt,name=parsed,proto3" json:"parsed,omitempty"` // 解析后的结构化数据
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1470,13 +1437,6 @@ func (x *GetSummaryResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetSummaryResponse.ProtoReflect.Descriptor instead.
 func (*GetSummaryResponse) Descriptor() ([]byte, []int) {
 	return file_camera_v1_camera_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *GetSummaryResponse) GetRawText() string {
-	if x != nil {
-		return x.RawText
-	}
-	return ""
 }
 
 func (x *GetSummaryResponse) GetParsed() *CameraSummary {
@@ -2042,16 +2002,16 @@ var File_camera_v1_camera_proto protoreflect.FileDescriptor
 
 const file_camera_v1_camera_proto_rawDesc = "" +
 	"\n" +
-	"\x16camera/v1/camera.proto\x12\tcamera.v1\"\xba\x02\n" +
-	"\rCameraSummary\x12\"\n" +
-	"\fmanufacturer\x18\x01 \x01(\tR\fmanufacturer\x12\x14\n" +
-	"\x05model\x18\x02 \x01(\tR\x05model\x12)\n" +
-	"\x10firmware_version\x18\x03 \x01(\tR\x0ffirmwareVersion\x12#\n" +
-	"\rserial_number\x18\x04 \x01(\tR\fserialNumber\x12)\n" +
-	"\x10vendor_extension\x18\x05 \x01(\tR\x0fvendorExtension\x12\"\n" +
-	"\fcapabilities\x18\x06 \x03(\tR\fcapabilities\x12'\n" +
-	"\x0fcapture_formats\x18\a \x03(\tR\x0ecaptureFormats\x12'\n" +
-	"\x0fdisplay_formats\x18\b \x03(\tR\x0edisplayFormats\"\x92\x04\n" +
+	"\x16camera/v1/camera.proto\x12\tcamera.v1\"\xec\x01\n" +
+	"\rCameraSummary\x12\x14\n" +
+	"\x05model\x18\x01 \x01(\tR\x05model\x12\x16\n" +
+	"\x06driver\x18\x02 \x01(\tR\x06driver\x12\x1b\n" +
+	"\tport_path\x18\x03 \x01(\tR\bportPath\x12\x18\n" +
+	"\asummary\x18\x04 \x01(\tR\asummary\x12\x14\n" +
+	"\x05about\x18\x05 \x01(\tR\x05about\x12\x16\n" +
+	"\x06manual\x18\x06 \x01(\tR\x06manual\x120\n" +
+	"\astorage\x18\a \x01(\v2\x16.camera.v1.StorageInfoR\astorage\x12\x16\n" +
+	"\x06config\x18\b \x01(\tR\x06config\"\x92\x04\n" +
 	"\x0fCameraAbilities\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x12/\n" +
 	"\x06status\x18\x02 \x01(\x0e2\x17.camera.v1.DriverStatusR\x06status\x12'\n" +
@@ -2073,20 +2033,15 @@ const file_camera_v1_camera_proto_rawDesc = "" +
 	"\alibrary\x18\r \x01(\tR\alibrary\x12\x0e\n" +
 	"\x02id\x18\x0e \x01(\tR\x02id\x126\n" +
 	"\vdevice_type\x18\x0f \x01(\x0e2\x15.camera.v1.DeviceTypeR\n" +
-	"deviceType\"\xee\x02\n" +
-	"\vStorageInfo\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
-	"\abasedir\x18\x02 \x01(\tR\abasedir\x12\x14\n" +
-	"\x05label\x18\x03 \x01(\tR\x05label\x12 \n" +
-	"\vdescription\x18\x04 \x01(\tR\vdescription\x12*\n" +
-	"\x04type\x18\x05 \x01(\x0e2\x16.camera.v1.StorageTypeR\x04type\x120\n" +
-	"\x02fs\x18\x06 \x01(\x0e2 .camera.v1.StorageFilesystemTypeR\x02fs\x124\n" +
-	"\x06access\x18\a \x01(\x0e2\x1c.camera.v1.StorageAccessTypeR\x06access\x12'\n" +
-	"\x0fcapacity_kbytes\x18\b \x01(\x04R\x0ecapacityKbytes\x12\x1f\n" +
-	"\vfree_kbytes\x18\t \x01(\x04R\n" +
+	"deviceType\"\xca\x01\n" +
+	"\vStorageInfo\x12\x18\n" +
+	"\abasedir\x18\x01 \x01(\tR\abasedir\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12'\n" +
+	"\x0fcapacity_kbytes\x18\x04 \x01(\x04R\x0ecapacityKbytes\x12\x1f\n" +
+	"\vfree_kbytes\x18\x05 \x01(\x04R\n" +
 	"freeKbytes\x12\x1f\n" +
-	"\vfree_images\x18\n" +
-	" \x01(\x04R\n" +
+	"\vfree_images\x18\x06 \x01(\x04R\n" +
 	"freeImages\"5\n" +
 	"\tFileEntry\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
@@ -2108,9 +2063,8 @@ const file_camera_v1_camera_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
 	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
 	"\x04data\x18\x03 \x01(\fR\x04data\"\x13\n" +
-	"\x11GetSummaryRequest\"a\n" +
-	"\x12GetSummaryResponse\x12\x19\n" +
-	"\braw_text\x18\x01 \x01(\tR\arawText\x120\n" +
+	"\x11GetSummaryRequest\"F\n" +
+	"\x12GetSummaryResponse\x120\n" +
 	"\x06parsed\x18\x02 \x01(\v2\x18.camera.v1.CameraSummaryR\x06parsed\"\x15\n" +
 	"\x13GetAbilitiesRequest\"P\n" +
 	"\x14GetAbilitiesResponse\x128\n" +
@@ -2223,12 +2177,11 @@ const file_camera_v1_camera_proto_rawDesc = "" +
 	"\rFILE_TYPE_RAW\x10\x03\x12\x13\n" +
 	"\x0fFILE_TYPE_AUDIO\x10\x04\x12\x12\n" +
 	"\x0eFILE_TYPE_EXIF\x10\x05\x12\x16\n" +
-	"\x12FILE_TYPE_METADATA\x10\x062\xa8\x04\n" +
+	"\x12FILE_TYPE_METADATA\x10\x062\xd1\x03\n" +
 	"\rCameraService\x12I\n" +
 	"\n" +
 	"GetSummary\x12\x1c.camera.v1.GetSummaryRequest\x1a\x1d.camera.v1.GetSummaryResponse\x12O\n" +
-	"\fGetAbilities\x12\x1e.camera.v1.GetAbilitiesRequest\x1a\x1f.camera.v1.GetAbilitiesResponse\x12U\n" +
-	"\x0eGetStorageInfo\x12 .camera.v1.GetStorageInfoRequest\x1a!.camera.v1.GetStorageInfoResponse\x12F\n" +
+	"\fGetAbilities\x12\x1e.camera.v1.GetAbilitiesRequest\x1a\x1f.camera.v1.GetAbilitiesResponse\x12F\n" +
 	"\tListFiles\x12\x1b.camera.v1.ListFilesRequest\x1a\x1c.camera.v1.ListFilesResponse\x12L\n" +
 	"\vListFolders\x12\x1d.camera.v1.ListFoldersRequest\x1a\x1e.camera.v1.ListFoldersResponse\x12L\n" +
 	"\vGetFileInfo\x12\x1d.camera.v1.GetFileInfoRequest\x1a\x1e.camera.v1.GetFileInfoResponse\x12@\n" +
@@ -2287,44 +2240,40 @@ var file_camera_v1_camera_proto_goTypes = []any{
 	(*GetFileResponse)(nil),        // 33: camera.v1.GetFileResponse
 }
 var file_camera_v1_camera_proto_depIdxs = []int32{
-	1,  // 0: camera.v1.CameraAbilities.status:type_name -> camera.v1.DriverStatus
-	0,  // 1: camera.v1.CameraAbilities.port:type_name -> camera.v1.PortType
-	2,  // 2: camera.v1.CameraAbilities.device_type:type_name -> camera.v1.DeviceType
-	6,  // 3: camera.v1.StorageInfo.type:type_name -> camera.v1.StorageType
-	8,  // 4: camera.v1.StorageInfo.fs:type_name -> camera.v1.StorageFilesystemType
-	7,  // 5: camera.v1.StorageInfo.access:type_name -> camera.v1.StorageAccessType
-	11, // 6: camera.v1.FileInfoVariant.status:type_name -> camera.v1.FileStatus
-	10, // 7: camera.v1.FileInfoVariant.permissions:type_name -> camera.v1.FilePermission
-	17, // 8: camera.v1.FileInfo.preview:type_name -> camera.v1.FileInfoVariant
-	17, // 9: camera.v1.FileInfo.file:type_name -> camera.v1.FileInfoVariant
-	17, // 10: camera.v1.FileInfo.audio:type_name -> camera.v1.FileInfoVariant
-	13, // 11: camera.v1.GetSummaryResponse.parsed:type_name -> camera.v1.CameraSummary
-	14, // 12: camera.v1.GetAbilitiesResponse.abilities:type_name -> camera.v1.CameraAbilities
-	15, // 13: camera.v1.GetStorageInfoResponse.devices:type_name -> camera.v1.StorageInfo
-	16, // 14: camera.v1.ListFilesResponse.entries:type_name -> camera.v1.FileEntry
-	16, // 15: camera.v1.ListFoldersResponse.entries:type_name -> camera.v1.FileEntry
-	18, // 16: camera.v1.GetFileInfoResponse.info:type_name -> camera.v1.FileInfo
-	12, // 17: camera.v1.GetFileRequest.type:type_name -> camera.v1.FileType
-	19, // 18: camera.v1.GetFileResponse.file:type_name -> camera.v1.FileData
-	20, // 19: camera.v1.CameraService.GetSummary:input_type -> camera.v1.GetSummaryRequest
-	22, // 20: camera.v1.CameraService.GetAbilities:input_type -> camera.v1.GetAbilitiesRequest
-	24, // 21: camera.v1.CameraService.GetStorageInfo:input_type -> camera.v1.GetStorageInfoRequest
-	26, // 22: camera.v1.CameraService.ListFiles:input_type -> camera.v1.ListFilesRequest
-	28, // 23: camera.v1.CameraService.ListFolders:input_type -> camera.v1.ListFoldersRequest
-	30, // 24: camera.v1.CameraService.GetFileInfo:input_type -> camera.v1.GetFileInfoRequest
-	32, // 25: camera.v1.CameraService.GetFile:input_type -> camera.v1.GetFileRequest
-	21, // 26: camera.v1.CameraService.GetSummary:output_type -> camera.v1.GetSummaryResponse
-	23, // 27: camera.v1.CameraService.GetAbilities:output_type -> camera.v1.GetAbilitiesResponse
-	25, // 28: camera.v1.CameraService.GetStorageInfo:output_type -> camera.v1.GetStorageInfoResponse
-	27, // 29: camera.v1.CameraService.ListFiles:output_type -> camera.v1.ListFilesResponse
-	29, // 30: camera.v1.CameraService.ListFolders:output_type -> camera.v1.ListFoldersResponse
-	31, // 31: camera.v1.CameraService.GetFileInfo:output_type -> camera.v1.GetFileInfoResponse
-	33, // 32: camera.v1.CameraService.GetFile:output_type -> camera.v1.GetFileResponse
-	26, // [26:33] is the sub-list for method output_type
-	19, // [19:26] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	15, // 0: camera.v1.CameraSummary.storage:type_name -> camera.v1.StorageInfo
+	1,  // 1: camera.v1.CameraAbilities.status:type_name -> camera.v1.DriverStatus
+	0,  // 2: camera.v1.CameraAbilities.port:type_name -> camera.v1.PortType
+	2,  // 3: camera.v1.CameraAbilities.device_type:type_name -> camera.v1.DeviceType
+	11, // 4: camera.v1.FileInfoVariant.status:type_name -> camera.v1.FileStatus
+	10, // 5: camera.v1.FileInfoVariant.permissions:type_name -> camera.v1.FilePermission
+	17, // 6: camera.v1.FileInfo.preview:type_name -> camera.v1.FileInfoVariant
+	17, // 7: camera.v1.FileInfo.file:type_name -> camera.v1.FileInfoVariant
+	17, // 8: camera.v1.FileInfo.audio:type_name -> camera.v1.FileInfoVariant
+	13, // 9: camera.v1.GetSummaryResponse.parsed:type_name -> camera.v1.CameraSummary
+	14, // 10: camera.v1.GetAbilitiesResponse.abilities:type_name -> camera.v1.CameraAbilities
+	15, // 11: camera.v1.GetStorageInfoResponse.devices:type_name -> camera.v1.StorageInfo
+	16, // 12: camera.v1.ListFilesResponse.entries:type_name -> camera.v1.FileEntry
+	16, // 13: camera.v1.ListFoldersResponse.entries:type_name -> camera.v1.FileEntry
+	18, // 14: camera.v1.GetFileInfoResponse.info:type_name -> camera.v1.FileInfo
+	12, // 15: camera.v1.GetFileRequest.type:type_name -> camera.v1.FileType
+	19, // 16: camera.v1.GetFileResponse.file:type_name -> camera.v1.FileData
+	20, // 17: camera.v1.CameraService.GetSummary:input_type -> camera.v1.GetSummaryRequest
+	22, // 18: camera.v1.CameraService.GetAbilities:input_type -> camera.v1.GetAbilitiesRequest
+	26, // 19: camera.v1.CameraService.ListFiles:input_type -> camera.v1.ListFilesRequest
+	28, // 20: camera.v1.CameraService.ListFolders:input_type -> camera.v1.ListFoldersRequest
+	30, // 21: camera.v1.CameraService.GetFileInfo:input_type -> camera.v1.GetFileInfoRequest
+	32, // 22: camera.v1.CameraService.GetFile:input_type -> camera.v1.GetFileRequest
+	21, // 23: camera.v1.CameraService.GetSummary:output_type -> camera.v1.GetSummaryResponse
+	23, // 24: camera.v1.CameraService.GetAbilities:output_type -> camera.v1.GetAbilitiesResponse
+	27, // 25: camera.v1.CameraService.ListFiles:output_type -> camera.v1.ListFilesResponse
+	29, // 26: camera.v1.CameraService.ListFolders:output_type -> camera.v1.ListFoldersResponse
+	31, // 27: camera.v1.CameraService.GetFileInfo:output_type -> camera.v1.GetFileInfoResponse
+	33, // 28: camera.v1.CameraService.GetFile:output_type -> camera.v1.GetFileResponse
+	23, // [23:29] is the sub-list for method output_type
+	17, // [17:23] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_camera_v1_camera_proto_init() }
