@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ci.zevix.uk/moment-go/internal/domain"
+	camerav1 "ci.zevix.uk/moment-go/protogo/camera/v1"
 	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
 )
 
@@ -34,18 +35,6 @@ var (
 
 // IsUnsupported 判断错误是否为“后端在当前平台不可用”。
 func IsUnsupported(err error) bool { return errors.Is(err, ErrUnsupportedPlatform) }
-
-// // ConnectionType 是连接方式。
-// type ConnectionType int
-
-// const (
-// 	// ConnectAuto 自动探测（USB 相机，取第一个结果）。
-// 	ConnectAuto ConnectionType = iota
-// 	// ConnectUSB 通过 USB 端口连接。
-// 	ConnectUSB
-// 	// ConnectPTPIP 通过 PTP/IP 网络协议连接。
-// 	ConnectPTPIP
-// )
 
 // ConnectOptions 是连接参数。
 type ConnectOptions struct {
@@ -135,6 +124,17 @@ type CameraInfo struct {
 	Manual   string
 	Storage  []StorageInfo
 	Config   *ConfigItem
+}
+
+func (c CameraInfo) ProtoMsg() *camerav1.CameraSummary {
+	return &camerav1.CameraSummary{
+		Model:    c.Model,
+		Driver:   c.Driver,
+		PortPath: c.PortPath,
+		Summary:  c.Summary,
+		About:    c.About,
+		Manual:   c.Manual,
+	}
 }
 
 // CameraContent 是一次目录树遍历的结果（预览所有内容）。
