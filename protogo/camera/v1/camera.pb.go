@@ -9,6 +9,7 @@ package camerav1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -1096,8 +1097,15 @@ func (x *StorageInfo) GetFreeImages() uint64 {
 
 type FileEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`   // 文件/目录名
-	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"` // 附加信息
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"` // 文件/目录名
+	Floder        string                 `protobuf:"bytes,2,opt,name=floder,proto3" json:"floder,omitempty"`
+	Size          int64                  `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
+	MimeType      string                 `protobuf:"bytes,4,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	Width         int32                  `protobuf:"varint,5,opt,name=width,proto3" json:"width,omitempty"`
+	Height        int32                  `protobuf:"varint,6,opt,name=height,proto3" json:"height,omitempty"`
+	Mtime         *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=mtime,proto3" json:"mtime,omitempty"`
+	Downloaded    bool                   `protobuf:"varint,8,opt,name=downloaded,proto3" json:"downloaded,omitempty"`
+	Permissions   int32                  `protobuf:"varint,9,opt,name=permissions,proto3" json:"permissions,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1139,11 +1147,60 @@ func (x *FileEntry) GetName() string {
 	return ""
 }
 
-func (x *FileEntry) GetValue() string {
+func (x *FileEntry) GetFloder() string {
 	if x != nil {
-		return x.Value
+		return x.Floder
 	}
 	return ""
+}
+
+func (x *FileEntry) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *FileEntry) GetMimeType() string {
+	if x != nil {
+		return x.MimeType
+	}
+	return ""
+}
+
+func (x *FileEntry) GetWidth() int32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *FileEntry) GetHeight() int32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+func (x *FileEntry) GetMtime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Mtime
+	}
+	return nil
+}
+
+func (x *FileEntry) GetDownloaded() bool {
+	if x != nil {
+		return x.Downloaded
+	}
+	return false
+}
+
+func (x *FileEntry) GetPermissions() int32 {
+	if x != nil {
+		return x.Permissions
+	}
+	return 0
 }
 
 type FileInfoVariant struct {
@@ -2002,7 +2059,7 @@ var File_camera_v1_camera_proto protoreflect.FileDescriptor
 
 const file_camera_v1_camera_proto_rawDesc = "" +
 	"\n" +
-	"\x16camera/v1/camera.proto\x12\tcamera.v1\"\xec\x01\n" +
+	"\x16camera/v1/camera.proto\x12\tcamera.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xec\x01\n" +
 	"\rCameraSummary\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x12\x16\n" +
 	"\x06driver\x18\x02 \x01(\tR\x06driver\x12\x1b\n" +
@@ -2042,10 +2099,19 @@ const file_camera_v1_camera_proto_rawDesc = "" +
 	"\vfree_kbytes\x18\x05 \x01(\x04R\n" +
 	"freeKbytes\x12\x1f\n" +
 	"\vfree_images\x18\x06 \x01(\x04R\n" +
-	"freeImages\"5\n" +
+	"freeImages\"\x8a\x02\n" +
 	"\tFileEntry\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\"\x81\x02\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
+	"\x06floder\x18\x02 \x01(\tR\x06floder\x12\x12\n" +
+	"\x04size\x18\x03 \x01(\x03R\x04size\x12\x1b\n" +
+	"\tmime_type\x18\x04 \x01(\tR\bmimeType\x12\x14\n" +
+	"\x05width\x18\x05 \x01(\x05R\x05width\x12\x16\n" +
+	"\x06height\x18\x06 \x01(\x05R\x06height\x120\n" +
+	"\x05mtime\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\x05mtime\x12\x1e\n" +
+	"\n" +
+	"downloaded\x18\b \x01(\bR\n" +
+	"downloaded\x12 \n" +
+	"\vpermissions\x18\t \x01(\x05R\vpermissions\"\x81\x02\n" +
 	"\x0fFileInfoVariant\x12\x16\n" +
 	"\x06fields\x18\x01 \x01(\x05R\x06fields\x12-\n" +
 	"\x06status\x18\x02 \x01(\x0e2\x15.camera.v1.FileStatusR\x06status\x12\x12\n" +
@@ -2238,42 +2304,44 @@ var file_camera_v1_camera_proto_goTypes = []any{
 	(*GetFileInfoResponse)(nil),    // 31: camera.v1.GetFileInfoResponse
 	(*GetFileRequest)(nil),         // 32: camera.v1.GetFileRequest
 	(*GetFileResponse)(nil),        // 33: camera.v1.GetFileResponse
+	(*timestamppb.Timestamp)(nil),  // 34: google.protobuf.Timestamp
 }
 var file_camera_v1_camera_proto_depIdxs = []int32{
 	15, // 0: camera.v1.CameraSummary.storage:type_name -> camera.v1.StorageInfo
 	1,  // 1: camera.v1.CameraAbilities.status:type_name -> camera.v1.DriverStatus
 	0,  // 2: camera.v1.CameraAbilities.port:type_name -> camera.v1.PortType
 	2,  // 3: camera.v1.CameraAbilities.device_type:type_name -> camera.v1.DeviceType
-	11, // 4: camera.v1.FileInfoVariant.status:type_name -> camera.v1.FileStatus
-	10, // 5: camera.v1.FileInfoVariant.permissions:type_name -> camera.v1.FilePermission
-	17, // 6: camera.v1.FileInfo.preview:type_name -> camera.v1.FileInfoVariant
-	17, // 7: camera.v1.FileInfo.file:type_name -> camera.v1.FileInfoVariant
-	17, // 8: camera.v1.FileInfo.audio:type_name -> camera.v1.FileInfoVariant
-	13, // 9: camera.v1.GetSummaryResponse.parsed:type_name -> camera.v1.CameraSummary
-	14, // 10: camera.v1.GetAbilitiesResponse.abilities:type_name -> camera.v1.CameraAbilities
-	15, // 11: camera.v1.GetStorageInfoResponse.devices:type_name -> camera.v1.StorageInfo
-	16, // 12: camera.v1.ListFilesResponse.entries:type_name -> camera.v1.FileEntry
-	16, // 13: camera.v1.ListFoldersResponse.entries:type_name -> camera.v1.FileEntry
-	18, // 14: camera.v1.GetFileInfoResponse.info:type_name -> camera.v1.FileInfo
-	12, // 15: camera.v1.GetFileRequest.type:type_name -> camera.v1.FileType
-	19, // 16: camera.v1.GetFileResponse.file:type_name -> camera.v1.FileData
-	20, // 17: camera.v1.CameraService.GetSummary:input_type -> camera.v1.GetSummaryRequest
-	22, // 18: camera.v1.CameraService.GetAbilities:input_type -> camera.v1.GetAbilitiesRequest
-	26, // 19: camera.v1.CameraService.ListFiles:input_type -> camera.v1.ListFilesRequest
-	28, // 20: camera.v1.CameraService.ListFolders:input_type -> camera.v1.ListFoldersRequest
-	30, // 21: camera.v1.CameraService.GetFileInfo:input_type -> camera.v1.GetFileInfoRequest
-	32, // 22: camera.v1.CameraService.GetFile:input_type -> camera.v1.GetFileRequest
-	21, // 23: camera.v1.CameraService.GetSummary:output_type -> camera.v1.GetSummaryResponse
-	23, // 24: camera.v1.CameraService.GetAbilities:output_type -> camera.v1.GetAbilitiesResponse
-	27, // 25: camera.v1.CameraService.ListFiles:output_type -> camera.v1.ListFilesResponse
-	29, // 26: camera.v1.CameraService.ListFolders:output_type -> camera.v1.ListFoldersResponse
-	31, // 27: camera.v1.CameraService.GetFileInfo:output_type -> camera.v1.GetFileInfoResponse
-	33, // 28: camera.v1.CameraService.GetFile:output_type -> camera.v1.GetFileResponse
-	23, // [23:29] is the sub-list for method output_type
-	17, // [17:23] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	34, // 4: camera.v1.FileEntry.mtime:type_name -> google.protobuf.Timestamp
+	11, // 5: camera.v1.FileInfoVariant.status:type_name -> camera.v1.FileStatus
+	10, // 6: camera.v1.FileInfoVariant.permissions:type_name -> camera.v1.FilePermission
+	17, // 7: camera.v1.FileInfo.preview:type_name -> camera.v1.FileInfoVariant
+	17, // 8: camera.v1.FileInfo.file:type_name -> camera.v1.FileInfoVariant
+	17, // 9: camera.v1.FileInfo.audio:type_name -> camera.v1.FileInfoVariant
+	13, // 10: camera.v1.GetSummaryResponse.parsed:type_name -> camera.v1.CameraSummary
+	14, // 11: camera.v1.GetAbilitiesResponse.abilities:type_name -> camera.v1.CameraAbilities
+	15, // 12: camera.v1.GetStorageInfoResponse.devices:type_name -> camera.v1.StorageInfo
+	16, // 13: camera.v1.ListFilesResponse.entries:type_name -> camera.v1.FileEntry
+	16, // 14: camera.v1.ListFoldersResponse.entries:type_name -> camera.v1.FileEntry
+	18, // 15: camera.v1.GetFileInfoResponse.info:type_name -> camera.v1.FileInfo
+	12, // 16: camera.v1.GetFileRequest.type:type_name -> camera.v1.FileType
+	19, // 17: camera.v1.GetFileResponse.file:type_name -> camera.v1.FileData
+	20, // 18: camera.v1.CameraService.GetSummary:input_type -> camera.v1.GetSummaryRequest
+	22, // 19: camera.v1.CameraService.GetAbilities:input_type -> camera.v1.GetAbilitiesRequest
+	26, // 20: camera.v1.CameraService.ListFiles:input_type -> camera.v1.ListFilesRequest
+	28, // 21: camera.v1.CameraService.ListFolders:input_type -> camera.v1.ListFoldersRequest
+	30, // 22: camera.v1.CameraService.GetFileInfo:input_type -> camera.v1.GetFileInfoRequest
+	32, // 23: camera.v1.CameraService.GetFile:input_type -> camera.v1.GetFileRequest
+	21, // 24: camera.v1.CameraService.GetSummary:output_type -> camera.v1.GetSummaryResponse
+	23, // 25: camera.v1.CameraService.GetAbilities:output_type -> camera.v1.GetAbilitiesResponse
+	27, // 26: camera.v1.CameraService.ListFiles:output_type -> camera.v1.ListFilesResponse
+	29, // 27: camera.v1.CameraService.ListFolders:output_type -> camera.v1.ListFoldersResponse
+	31, // 28: camera.v1.CameraService.GetFileInfo:output_type -> camera.v1.GetFileInfoResponse
+	33, // 29: camera.v1.CameraService.GetFile:output_type -> camera.v1.GetFileResponse
+	24, // [24:30] is the sub-list for method output_type
+	18, // [18:24] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_camera_v1_camera_proto_init() }
