@@ -30,15 +30,6 @@ func (cameraService) GetSummary(ctx context.Context, req *camerav1.GetSummaryReq
 	}, status.Error(codes.Unimplemented, "method GetSummary not implemented")
 }
 
-func (cameraService) GetAbilities(ctx context.Context, req *camerav1.GetAbilitiesRequest) (*camerav1.GetAbilitiesResponse, error) {
-	c, err := client.Default().Camera()
-	if err != nil {
-		return nil, err
-	}
-
-	return nil, status.Error(codes.Unimplemented, "method GetAbilities not implemented")
-}
-
 func (cameraService) ListFiles(ctx context.Context, req *camerav1.ListFilesRequest) (*camerav1.ListFilesResponse, error) {
 	// 此处返回文件并不返回关于缩略图，防止加载过多缩略图导致接口面板，UI响应迟缓，使用异步加载缩略图数据
 	fileInfo := make([]*camerav1.FileEntry, 0)
