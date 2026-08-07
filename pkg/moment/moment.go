@@ -142,11 +142,6 @@ func (c *Camera) GetFileInfo(ctx context.Context, folder, name string) (File, er
 	return toFile(f), nil
 }
 
-// Download 下载文件完整内容到内存。
-func (c *Camera) Download(ctx context.Context, folder, name string) ([]byte, error) {
-	return c.app.Download(ctx, folder, name)
-}
-
 // DownloadTo 下载文件并写入 w（例如 os.File、bytes.Buffer）。
 func (c *Camera) DownloadTo(ctx context.Context, folder, name string, w io.Writer) error {
 	return c.app.DownloadTo(ctx, folder, name, w)
