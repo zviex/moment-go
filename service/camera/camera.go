@@ -27,7 +27,7 @@ func (cameraService) GetSummary(ctx context.Context, req *camerav1.GetSummaryReq
 
 	return &camerav1.GetSummaryResponse{
 		Parsed: info.ProtoMsg(),
-	}, status.Error(codes.Unimplemented, "method GetSummary not implemented")
+	}, nil
 }
 
 func (cameraService) ListFiles(ctx context.Context, req *camerav1.ListFilesRequest) (*camerav1.ListFilesResponse, error) {
