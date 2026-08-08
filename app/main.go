@@ -7,8 +7,14 @@
 //	go build -o app_demo ./app
 package main
 
-import "fmt"
+import (
+	"ci.zevix.uk/moment-go/server"
+	"ci.zevix.uk/moment-go/service"
+)
 
 func main() {
-	fmt.Println("hello world")
+	service.Init()
+	if err := server.DefaultSrv().Run(); err != nil {
+		panic(err)
+	}
 }
