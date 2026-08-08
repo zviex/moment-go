@@ -1619,206 +1619,6 @@ func (x *ListFoldersResponse) GetEntries() []*FileEntry {
 	return nil
 }
 
-type GetFileInfoRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Folder        string                 `protobuf:"bytes,1,opt,name=folder,proto3" json:"folder,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetFileInfoRequest) Reset() {
-	*x = GetFileInfoRequest{}
-	mi := &file_camera_v1_camera_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetFileInfoRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetFileInfoRequest) ProtoMessage() {}
-
-func (x *GetFileInfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_camera_v1_camera_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetFileInfoRequest.ProtoReflect.Descriptor instead.
-func (*GetFileInfoRequest) Descriptor() ([]byte, []int) {
-	return file_camera_v1_camera_proto_rawDescGZIP(), []int{14}
-}
-
-func (x *GetFileInfoRequest) GetFolder() string {
-	if x != nil {
-		return x.Folder
-	}
-	return ""
-}
-
-func (x *GetFileInfoRequest) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-type GetFileInfoResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Info          *FileInfo              `protobuf:"bytes,1,opt,name=info,proto3" json:"info,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetFileInfoResponse) Reset() {
-	*x = GetFileInfoResponse{}
-	mi := &file_camera_v1_camera_proto_msgTypes[15]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetFileInfoResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetFileInfoResponse) ProtoMessage() {}
-
-func (x *GetFileInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_camera_v1_camera_proto_msgTypes[15]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetFileInfoResponse.ProtoReflect.Descriptor instead.
-func (*GetFileInfoResponse) Descriptor() ([]byte, []int) {
-	return file_camera_v1_camera_proto_rawDescGZIP(), []int{15}
-}
-
-func (x *GetFileInfoResponse) GetInfo() *FileInfo {
-	if x != nil {
-		return x.Info
-	}
-	return nil
-}
-
-type GetFileRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Folder        string                 `protobuf:"bytes,1,opt,name=folder,proto3" json:"folder,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Type          FileType               `protobuf:"varint,3,opt,name=type,proto3,enum=camera.v1.FileType" json:"type,omitempty"` // NORMAL = 原文件, PREVIEW = 缩略图
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetFileRequest) Reset() {
-	*x = GetFileRequest{}
-	mi := &file_camera_v1_camera_proto_msgTypes[16]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetFileRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetFileRequest) ProtoMessage() {}
-
-func (x *GetFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_camera_v1_camera_proto_msgTypes[16]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetFileRequest.ProtoReflect.Descriptor instead.
-func (*GetFileRequest) Descriptor() ([]byte, []int) {
-	return file_camera_v1_camera_proto_rawDescGZIP(), []int{16}
-}
-
-func (x *GetFileRequest) GetFolder() string {
-	if x != nil {
-		return x.Folder
-	}
-	return ""
-}
-
-func (x *GetFileRequest) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *GetFileRequest) GetType() FileType {
-	if x != nil {
-		return x.Type
-	}
-	return FileType_FILE_TYPE_UNSPECIFIED
-}
-
-type GetFileResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	File          *FileData              `protobuf:"bytes,1,opt,name=file,proto3" json:"file,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetFileResponse) Reset() {
-	*x = GetFileResponse{}
-	mi := &file_camera_v1_camera_proto_msgTypes[17]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetFileResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetFileResponse) ProtoMessage() {}
-
-func (x *GetFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_camera_v1_camera_proto_msgTypes[17]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetFileResponse.ProtoReflect.Descriptor instead.
-func (*GetFileResponse) Descriptor() ([]byte, []int) {
-	return file_camera_v1_camera_proto_rawDescGZIP(), []int{17}
-}
-
-func (x *GetFileResponse) GetFile() *FileData {
-	if x != nil {
-		return x.File
-	}
-	return nil
-}
-
 var File_camera_v1_camera_proto protoreflect.FileDescriptor
 
 const file_camera_v1_camera_proto_rawDesc = "" +
@@ -1886,18 +1686,7 @@ const file_camera_v1_camera_proto_rawDesc = "" +
 	"\x06folder\x18\x01 \x01(\tR\x06folder\"]\n" +
 	"\x13ListFoldersResponse\x12\x16\n" +
 	"\x06folder\x18\x01 \x01(\tR\x06folder\x12.\n" +
-	"\aentries\x18\x02 \x03(\v2\x14.camera.v1.FileEntryR\aentries\"@\n" +
-	"\x12GetFileInfoRequest\x12\x16\n" +
-	"\x06folder\x18\x01 \x01(\tR\x06folder\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\">\n" +
-	"\x13GetFileInfoResponse\x12'\n" +
-	"\x04info\x18\x01 \x01(\v2\x13.camera.v1.FileInfoR\x04info\"e\n" +
-	"\x0eGetFileRequest\x12\x16\n" +
-	"\x06folder\x18\x01 \x01(\tR\x06folder\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12'\n" +
-	"\x04type\x18\x03 \x01(\x0e2\x13.camera.v1.FileTypeR\x04type\":\n" +
-	"\x0fGetFileResponse\x12'\n" +
-	"\x04file\x18\x01 \x01(\v2\x13.camera.v1.FileDataR\x04file*\xc1\x01\n" +
+	"\aentries\x18\x02 \x03(\v2\x14.camera.v1.FileEntryR\aentries*\xc1\x01\n" +
 	"\bPortType\x12\x19\n" +
 	"\x15PORT_TYPE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10PORT_TYPE_SERIAL\x10\x01\x12\x11\n" +
@@ -1982,14 +1771,12 @@ const file_camera_v1_camera_proto_rawDesc = "" +
 	"\rFILE_TYPE_RAW\x10\x03\x12\x13\n" +
 	"\x0fFILE_TYPE_AUDIO\x10\x04\x12\x12\n" +
 	"\x0eFILE_TYPE_EXIF\x10\x05\x12\x16\n" +
-	"\x12FILE_TYPE_METADATA\x10\x062\x80\x03\n" +
+	"\x12FILE_TYPE_METADATA\x10\x062\xf0\x01\n" +
 	"\rCameraService\x12I\n" +
 	"\n" +
 	"GetSummary\x12\x1c.camera.v1.GetSummaryRequest\x1a\x1d.camera.v1.GetSummaryResponse\x12F\n" +
 	"\tListFiles\x12\x1b.camera.v1.ListFilesRequest\x1a\x1c.camera.v1.ListFilesResponse\x12L\n" +
-	"\vListFolders\x12\x1d.camera.v1.ListFoldersRequest\x1a\x1e.camera.v1.ListFoldersResponse\x12L\n" +
-	"\vGetFileInfo\x12\x1d.camera.v1.GetFileInfoRequest\x1a\x1e.camera.v1.GetFileInfoResponse\x12@\n" +
-	"\aGetFile\x12\x19.camera.v1.GetFileRequest\x1a\x1a.camera.v1.GetFileResponseB\x93\x01\n" +
+	"\vListFolders\x12\x1d.camera.v1.ListFoldersRequest\x1a\x1e.camera.v1.ListFoldersResponseB\x93\x01\n" +
 	"\rcom.camera.v1B\vCameraProtoP\x01Z0ci.zevix.uk/moment-go/protogo/camera/v1;camerav1\xa2\x02\x03CXX\xaa\x02\tCamera.V1\xca\x02\tCamera\\V1\xe2\x02\x15Camera\\V1\\GPBMetadata\xea\x02\n" +
 	"Camera::V1b\x06proto3"
 
@@ -2006,7 +1793,7 @@ func file_camera_v1_camera_proto_rawDescGZIP() []byte {
 }
 
 var file_camera_v1_camera_proto_enumTypes = make([]protoimpl.EnumInfo, 13)
-var file_camera_v1_camera_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_camera_v1_camera_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_camera_v1_camera_proto_goTypes = []any{
 	(PortType)(0),                  // 0: camera.v1.PortType
 	(DriverStatus)(0),              // 1: camera.v1.DriverStatus
@@ -2035,15 +1822,11 @@ var file_camera_v1_camera_proto_goTypes = []any{
 	(*ListFilesResponse)(nil),      // 24: camera.v1.ListFilesResponse
 	(*ListFoldersRequest)(nil),     // 25: camera.v1.ListFoldersRequest
 	(*ListFoldersResponse)(nil),    // 26: camera.v1.ListFoldersResponse
-	(*GetFileInfoRequest)(nil),     // 27: camera.v1.GetFileInfoRequest
-	(*GetFileInfoResponse)(nil),    // 28: camera.v1.GetFileInfoResponse
-	(*GetFileRequest)(nil),         // 29: camera.v1.GetFileRequest
-	(*GetFileResponse)(nil),        // 30: camera.v1.GetFileResponse
-	(*timestamppb.Timestamp)(nil),  // 31: google.protobuf.Timestamp
+	(*timestamppb.Timestamp)(nil),  // 27: google.protobuf.Timestamp
 }
 var file_camera_v1_camera_proto_depIdxs = []int32{
 	14, // 0: camera.v1.CameraSummary.storage:type_name -> camera.v1.StorageInfo
-	31, // 1: camera.v1.FileEntry.mtime:type_name -> google.protobuf.Timestamp
+	27, // 1: camera.v1.FileEntry.mtime:type_name -> google.protobuf.Timestamp
 	11, // 2: camera.v1.FileInfoVariant.status:type_name -> camera.v1.FileStatus
 	10, // 3: camera.v1.FileInfoVariant.permissions:type_name -> camera.v1.FilePermission
 	16, // 4: camera.v1.FileInfo.preview:type_name -> camera.v1.FileInfoVariant
@@ -2053,24 +1836,17 @@ var file_camera_v1_camera_proto_depIdxs = []int32{
 	14, // 8: camera.v1.GetStorageInfoResponse.devices:type_name -> camera.v1.StorageInfo
 	15, // 9: camera.v1.ListFilesResponse.entries:type_name -> camera.v1.FileEntry
 	15, // 10: camera.v1.ListFoldersResponse.entries:type_name -> camera.v1.FileEntry
-	17, // 11: camera.v1.GetFileInfoResponse.info:type_name -> camera.v1.FileInfo
-	12, // 12: camera.v1.GetFileRequest.type:type_name -> camera.v1.FileType
-	18, // 13: camera.v1.GetFileResponse.file:type_name -> camera.v1.FileData
-	19, // 14: camera.v1.CameraService.GetSummary:input_type -> camera.v1.GetSummaryRequest
-	23, // 15: camera.v1.CameraService.ListFiles:input_type -> camera.v1.ListFilesRequest
-	25, // 16: camera.v1.CameraService.ListFolders:input_type -> camera.v1.ListFoldersRequest
-	27, // 17: camera.v1.CameraService.GetFileInfo:input_type -> camera.v1.GetFileInfoRequest
-	29, // 18: camera.v1.CameraService.GetFile:input_type -> camera.v1.GetFileRequest
-	20, // 19: camera.v1.CameraService.GetSummary:output_type -> camera.v1.GetSummaryResponse
-	24, // 20: camera.v1.CameraService.ListFiles:output_type -> camera.v1.ListFilesResponse
-	26, // 21: camera.v1.CameraService.ListFolders:output_type -> camera.v1.ListFoldersResponse
-	28, // 22: camera.v1.CameraService.GetFileInfo:output_type -> camera.v1.GetFileInfoResponse
-	30, // 23: camera.v1.CameraService.GetFile:output_type -> camera.v1.GetFileResponse
-	19, // [19:24] is the sub-list for method output_type
-	14, // [14:19] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	19, // 11: camera.v1.CameraService.GetSummary:input_type -> camera.v1.GetSummaryRequest
+	23, // 12: camera.v1.CameraService.ListFiles:input_type -> camera.v1.ListFilesRequest
+	25, // 13: camera.v1.CameraService.ListFolders:input_type -> camera.v1.ListFoldersRequest
+	20, // 14: camera.v1.CameraService.GetSummary:output_type -> camera.v1.GetSummaryResponse
+	24, // 15: camera.v1.CameraService.ListFiles:output_type -> camera.v1.ListFilesResponse
+	26, // 16: camera.v1.CameraService.ListFolders:output_type -> camera.v1.ListFoldersResponse
+	14, // [14:17] is the sub-list for method output_type
+	11, // [11:14] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_camera_v1_camera_proto_init() }
@@ -2084,7 +1860,7 @@ func file_camera_v1_camera_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_camera_v1_camera_proto_rawDesc), len(file_camera_v1_camera_proto_rawDesc)),
 			NumEnums:      13,
-			NumMessages:   18,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

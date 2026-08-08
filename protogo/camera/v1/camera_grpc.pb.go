@@ -22,8 +22,6 @@ const (
 	CameraService_GetSummary_FullMethodName  = "/camera.v1.CameraService/GetSummary"
 	CameraService_ListFiles_FullMethodName   = "/camera.v1.CameraService/ListFiles"
 	CameraService_ListFolders_FullMethodName = "/camera.v1.CameraService/ListFolders"
-	CameraService_GetFileInfo_FullMethodName = "/camera.v1.CameraService/GetFileInfo"
-	CameraService_GetFile_FullMethodName     = "/camera.v1.CameraService/GetFile"
 )
 
 // CameraServiceClient is the client API for CameraService service.
@@ -33,8 +31,6 @@ type CameraServiceClient interface {
 	GetSummary(ctx context.Context, in *GetSummaryRequest, opts ...grpc.CallOption) (*GetSummaryResponse, error)
 	ListFiles(ctx context.Context, in *ListFilesRequest, opts ...grpc.CallOption) (*ListFilesResponse, error)
 	ListFolders(ctx context.Context, in *ListFoldersRequest, opts ...grpc.CallOption) (*ListFoldersResponse, error)
-	GetFileInfo(ctx context.Context, in *GetFileInfoRequest, opts ...grpc.CallOption) (*GetFileInfoResponse, error)
-	GetFile(ctx context.Context, in *GetFileRequest, opts ...grpc.CallOption) (*GetFileResponse, error)
 }
 
 type cameraServiceClient struct {
@@ -75,26 +71,6 @@ func (c *cameraServiceClient) ListFolders(ctx context.Context, in *ListFoldersRe
 	return out, nil
 }
 
-func (c *cameraServiceClient) GetFileInfo(ctx context.Context, in *GetFileInfoRequest, opts ...grpc.CallOption) (*GetFileInfoResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetFileInfoResponse)
-	err := c.cc.Invoke(ctx, CameraService_GetFileInfo_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *cameraServiceClient) GetFile(ctx context.Context, in *GetFileRequest, opts ...grpc.CallOption) (*GetFileResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetFileResponse)
-	err := c.cc.Invoke(ctx, CameraService_GetFile_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // CameraServiceServer is the server API for CameraService service.
 // All implementations must embed UnimplementedCameraServiceServer
 // for forward compatibility.
@@ -102,8 +78,6 @@ type CameraServiceServer interface {
 	GetSummary(context.Context, *GetSummaryRequest) (*GetSummaryResponse, error)
 	ListFiles(context.Context, *ListFilesRequest) (*ListFilesResponse, error)
 	ListFolders(context.Context, *ListFoldersRequest) (*ListFoldersResponse, error)
-	GetFileInfo(context.Context, *GetFileInfoRequest) (*GetFileInfoResponse, error)
-	GetFile(context.Context, *GetFileRequest) (*GetFileResponse, error)
 	mustEmbedUnimplementedCameraServiceServer()
 }
 
@@ -122,12 +96,6 @@ func (UnimplementedCameraServiceServer) ListFiles(context.Context, *ListFilesReq
 }
 func (UnimplementedCameraServiceServer) ListFolders(context.Context, *ListFoldersRequest) (*ListFoldersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListFolders not implemented")
-}
-func (UnimplementedCameraServiceServer) GetFileInfo(context.Context, *GetFileInfoRequest) (*GetFileInfoResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetFileInfo not implemented")
-}
-func (UnimplementedCameraServiceServer) GetFile(context.Context, *GetFileRequest) (*GetFileResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetFile not implemented")
 }
 func (UnimplementedCameraServiceServer) mustEmbedUnimplementedCameraServiceServer() {}
 func (UnimplementedCameraServiceServer) testEmbeddedByValue()                       {}
@@ -204,42 +172,6 @@ func _CameraService_ListFolders_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _CameraService_GetFileInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetFileInfoRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(CameraServiceServer).GetFileInfo(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: CameraService_GetFileInfo_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CameraServiceServer).GetFileInfo(ctx, req.(*GetFileInfoRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _CameraService_GetFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetFileRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(CameraServiceServer).GetFile(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: CameraService_GetFile_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CameraServiceServer).GetFile(ctx, req.(*GetFileRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // CameraService_ServiceDesc is the grpc.ServiceDesc for CameraService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -258,14 +190,6 @@ var CameraService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListFolders",
 			Handler:    _CameraService_ListFolders_Handler,
-		},
-		{
-			MethodName: "GetFileInfo",
-			Handler:    _CameraService_GetFileInfo_Handler,
-		},
-		{
-			MethodName: "GetFile",
-			Handler:    _CameraService_GetFile_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
