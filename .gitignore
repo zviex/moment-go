@@ -3,3 +3,5 @@ libgphoto2-android/
 
 # 交叉编译产物
 bin/
+
+doc/
