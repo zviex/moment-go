@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 type Storage interface {
@@ -16,12 +17,30 @@ type (
 	Disk  struct{}
 )
 
+// diskBase 是 Disk 存储的物理根目录。所有下载的图片文件都落盘在这里，绝不用 cache。
+var (
+	diskMu   sync.Mutex
+	diskBase = filepath.Join("moment", "data")
+)
+
+// SetDiskBase 覆盖 Disk 存储的根目录（例如读取配置后调用，需先于首次写入）。
+func SetDiskBase(dir string) {
+	diskMu.Lock()
+	defer diskMu.Unlock()
+	diskBase = dir
+}
+
+// Path 返回 Disk 存储的根目录，首次调用时会惰性创建该目录。
 func (d *Disk) Path() string {
-	return ""
+	diskMu.Lock()
+	dir := diskBase
+	diskMu.Unlock()
+	_ = os.MkdirAll(dir, 0o755)
+	return dir
 }
 
 func (c *Cache) Path() string {
-	return ""
+	return os.TempDir()
 }
 
 func Read(s Storage, name string) (io.Reader, error) {
@@ -41,7 +60,11 @@ func read(s Storage, name string) (io.Reader, error) {
 }
 
 func write(s Storage, name string, writeFunc func(io.Writer) error) error {
-	file, err := os.Create(filepath.Join(s.Path(), name))
+	dir := s.Path()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	file, err := os.Create(filepath.Join(dir, name))
 	if err != nil {
 		return err
 	}
