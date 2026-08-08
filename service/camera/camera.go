@@ -67,11 +67,3 @@ func (cameraService) ListFiles(ctx context.Context, req *camerav1.ListFilesReque
 func (cameraService) ListFolders(ctx context.Context, req *camerav1.ListFoldersRequest) (*camerav1.ListFoldersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListFolders not implemented")
 }
-
-func (cameraService) GetFileInfo(ctx context.Context, req *camerav1.GetFileInfoRequest) (*camerav1.GetFileInfoResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetFileInfo not implemented")
-}
-
-func (cameraService) GetFile(ctx context.Context, req *camerav1.GetFileRequest) (*camerav1.GetFileResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetFile not implemented")
-}
