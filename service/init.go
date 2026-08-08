@@ -10,6 +10,6 @@ import (
 func Init() {
 	camera.Init()
 	connection.Init()
-	download.Init()
 	sync.Init()
+	download.Init()
 }
