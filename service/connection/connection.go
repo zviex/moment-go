@@ -5,7 +5,6 @@ import (
 
 	"ci.zevix.uk/moment-go/config"
 	"ci.zevix.uk/moment-go/connect"
-	configv1 "ci.zevix.uk/moment-go/protogo/config/v1"
 	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
 )
 
@@ -14,7 +13,7 @@ type connService struct {
 }
 
 func (connService) InitlizeCamera(ctx context.Context, req *connectionv1.InitlizeCameraRequest) (*connectionv1.InitlizeCameraResponse, error) {
-	config.SetDefault(&configv1.Config{Path: req.GetOpPath()})
+	config.SetDefault(req.Cfg)
 	return nil, nil
 }
 

@@ -1,6 +1,10 @@
 package mnet
 
-import "os"
+import (
+	"os"
+
+	"ci.zevix.uk/moment-go/config"
+)
 
 type Net interface {
 	Network() string
@@ -28,5 +32,5 @@ func (u Unix) Network() string {
 }
 
 func (u Unix) Addr() string {
-	return "/tmp/momnet.sock"
+	return config.Default().NetPath
 }
