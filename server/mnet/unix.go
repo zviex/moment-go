@@ -1,8 +1,6 @@
 package mnet
 
 import (
-	"os"
-
 	"ci.zevix.uk/moment-go/config"
 )
 
@@ -21,9 +19,6 @@ type Unix struct{}
 
 func NewUnix() *Unix {
 	u := &Unix{}
-
-	os.Remove(u.Addr())
-
 	return u
 }
 
