@@ -23,7 +23,8 @@ const (
 
 type Config struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	OpPath        string                 `protobuf:"bytes,1,opt,name=op_path,json=opPath,proto3" json:"op_path,omitempty"`
+	NetPath       string                 `protobuf:"bytes,2,opt,name=net_path,json=netPath,proto3" json:"net_path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -58,9 +59,16 @@ func (*Config) Descriptor() ([]byte, []int) {
 	return file_config_v1_config_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *Config) GetPath() string {
+func (x *Config) GetOpPath() string {
 	if x != nil {
-		return x.Path
+		return x.OpPath
+	}
+	return ""
+}
+
+func (x *Config) GetNetPath() string {
+	if x != nil {
+		return x.NetPath
 	}
 	return ""
 }
@@ -69,9 +77,10 @@ var File_config_v1_config_proto protoreflect.FileDescriptor
 
 const file_config_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x16config/v1/config.proto\x12\tconfig.v1\"\x1c\n" +
-	"\x06Config\x12\x12\n" +
-	"\x04path\x18\x01 \x01(\tR\x04pathB\x93\x01\n" +
+	"\x16config/v1/config.proto\x12\tconfig.v1\"<\n" +
+	"\x06Config\x12\x17\n" +
+	"\aop_path\x18\x01 \x01(\tR\x06opPath\x12\x19\n" +
+	"\bnet_path\x18\x02 \x01(\tR\anetPathB\x93\x01\n" +
 	"\rcom.config.v1B\vConfigProtoP\x01Z0ci.zevix.uk/moment-go/protogo/config/v1;configv1\xa2\x02\x03CXX\xaa\x02\tConfig.V1\xca\x02\tConfig\\V1\xe2\x02\x15Config\\V1\\GPBMetadata\xea\x02\n" +
 	"Config::V1b\x06proto3"
 

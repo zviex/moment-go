@@ -7,6 +7,7 @@
 package connectionv1
 
 import (
+	v1 "ci.zevix.uk/moment-go/protogo/config/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -75,8 +76,7 @@ func (ConnectionMode) EnumDescriptor() ([]byte, []int) {
 
 type InitlizeCameraRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	OpPath        string                 `protobuf:"bytes,1,opt,name=op_path,json=opPath,proto3" json:"op_path,omitempty"`    // the path of operation folder in android system
-	NetPath       string                 `protobuf:"bytes,2,opt,name=net_path,json=netPath,proto3" json:"net_path,omitempty"` // the path of ipc socket file
+	Cfg           *v1.Config             `protobuf:"bytes,1,opt,name=cfg,proto3" json:"cfg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -111,18 +111,11 @@ func (*InitlizeCameraRequest) Descriptor() ([]byte, []int) {
 	return file_connection_v1_connection_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *InitlizeCameraRequest) GetOpPath() string {
+func (x *InitlizeCameraRequest) GetCfg() *v1.Config {
 	if x != nil {
-		return x.OpPath
+		return x.Cfg
 	}
-	return ""
-}
-
-func (x *InitlizeCameraRequest) GetNetPath() string {
-	if x != nil {
-		return x.NetPath
-	}
-	return ""
+	return nil
 }
 
 type InitlizeCameraResponse struct {
@@ -285,10 +278,9 @@ var File_connection_v1_connection_proto protoreflect.FileDescriptor
 
 const file_connection_v1_connection_proto_rawDesc = "" +
 	"\n" +
-	"\x1econnection/v1/connection.proto\x12\rconnection.v1\"K\n" +
-	"\x15InitlizeCameraRequest\x12\x17\n" +
-	"\aop_path\x18\x01 \x01(\tR\x06opPath\x12\x19\n" +
-	"\bnet_path\x18\x02 \x01(\tR\anetPath\"\x18\n" +
+	"\x1econnection/v1/connection.proto\x12\rconnection.v1\x1a\x16config/v1/config.proto\"<\n" +
+	"\x15InitlizeCameraRequest\x12#\n" +
+	"\x03cfg\x18\x01 \x01(\v2\x11.config.v1.ConfigR\x03cfg\"\x18\n" +
 	"\x16InitlizeCameraResponse\"\xb0\x01\n" +
 	"\x14ConnectCameraRequest\x121\n" +
 	"\x04mode\x18\x01 \x01(\x0e2\x1d.connection.v1.ConnectionModeR\x04mode\x12\"\n" +
@@ -328,18 +320,20 @@ var file_connection_v1_connection_proto_goTypes = []any{
 	(*InitlizeCameraResponse)(nil), // 2: connection.v1.InitlizeCameraResponse
 	(*ConnectCameraRequest)(nil),   // 3: connection.v1.ConnectCameraRequest
 	(*ConnectCameraResponse)(nil),  // 4: connection.v1.ConnectCameraResponse
+	(*v1.Config)(nil),              // 5: config.v1.Config
 }
 var file_connection_v1_connection_proto_depIdxs = []int32{
-	0, // 0: connection.v1.ConnectCameraRequest.mode:type_name -> connection.v1.ConnectionMode
-	1, // 1: connection.v1.CameraConnectionService.InitlizeCamera:input_type -> connection.v1.InitlizeCameraRequest
-	3, // 2: connection.v1.CameraConnectionService.ConnectCamera:input_type -> connection.v1.ConnectCameraRequest
-	2, // 3: connection.v1.CameraConnectionService.InitlizeCamera:output_type -> connection.v1.InitlizeCameraResponse
-	4, // 4: connection.v1.CameraConnectionService.ConnectCamera:output_type -> connection.v1.ConnectCameraResponse
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	5, // 0: connection.v1.InitlizeCameraRequest.cfg:type_name -> config.v1.Config
+	0, // 1: connection.v1.ConnectCameraRequest.mode:type_name -> connection.v1.ConnectionMode
+	1, // 2: connection.v1.CameraConnectionService.InitlizeCamera:input_type -> connection.v1.InitlizeCameraRequest
+	3, // 3: connection.v1.CameraConnectionService.ConnectCamera:input_type -> connection.v1.ConnectCameraRequest
+	2, // 4: connection.v1.CameraConnectionService.InitlizeCamera:output_type -> connection.v1.InitlizeCameraResponse
+	4, // 5: connection.v1.CameraConnectionService.ConnectCamera:output_type -> connection.v1.ConnectCameraResponse
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_connection_v1_connection_proto_init() }
