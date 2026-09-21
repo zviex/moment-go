@@ -22,7 +22,8 @@ func New(opts ...Option) (*Client, error) {
 			opt(&o)
 		}
 	}
-	// 设置 camlib/iolib 环境变量（Android 上必须）。
+	// 按需设置 camlib/iolib 环境变量：桌面端留空即使用系统默认路径，
+	// Android 需要指向随 APK 打包并解压出来的驱动目录。
 	if err := gphoto2.Bootstrap(o.libraryRoot, o.camlibDir, o.iolibDir); err != nil {
 		return nil, err
 	}

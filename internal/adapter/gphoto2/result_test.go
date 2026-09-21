@@ -21,10 +21,9 @@ func TestResultToError(t *testing.T) {
 		{gpErrorDirectoryNotFound, domain.ErrDirectoryNotFound},
 		{gpErrorFileNotFound, domain.ErrFileNotFound},
 		{gpErrorCameraBusy, domain.ErrCameraBusy},
-		{gpErrorIOPTPDeviceBusy, domain.ErrCameraBusy},
 		{gpErrorCancel, domain.ErrCancelled},
-		{gpErrorIOPTPCancel, domain.ErrCancelled},
 		{gpErrorOSFailure, domain.ErrOSFailure},
+		{gpErrorIO, domain.ErrOSFailure},
 		{gpErrorNotSupported, domain.ErrUnsupported},
 	}
 	for _, c := range cases {

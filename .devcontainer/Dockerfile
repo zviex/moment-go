@@ -33,8 +33,10 @@ ENV PATH=${NDK_TOOLCHAIN}:${PATH}
 # 强制开启 cgo 动态链接（libgphoto2 通过 cgo 绑定）
 ENV CGO_ENABLED=1
 
+# libgphoto2 / libltdl 的宿主开发包：头文件统一使用仓库内的
+# libgphoto2-android/include，这里只需要提供可链接的 .so（宿主编译走系统库）。
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends unzip \
+    && apt-get install -y --no-install-recommends unzip libgphoto2-dev libltdl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fSL -o /tmp/android-ndk.zip \

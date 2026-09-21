@@ -1,4 +1,4 @@
-//go:build android && arm64
+//go:build cgo
 
 package gphoto2
 
@@ -8,92 +8,24 @@ package gphoto2
 */
 import "C"
 
-import (
-	"sync"
-	"unsafe"
-)
+import "errors"
 
-// contextHandlers 接收来自 C 回调的消息，转发给上层日志。
-type contextHandlers struct {
-	errorFunc   func(string)
-	statusFunc  func(string)
-	messageFunc func(string)
-}
-
-// 全局回调注册表：C 侧的 void* data 指向一个 C 堆上的 int（注册表键），
-// 避免把 Go 指针传给 C，规避 cgo 指针传递规则。
-var (
-	ctxMu   sync.RWMutex
-	ctxReg  = map[int]*contextHandlers{}
-	ctxNext int
-)
-
-// newGPContext 创建 GPContext，注册回调并返回回调数据指针（用于释放）。
-func newGPContext(h *contextHandlers) (*C.GPContext, unsafe.Pointer) {
-	if h == nil {
-		h = &contextHandlers{}
-	}
-	ctxMu.Lock()
-	ctxNext++
-	id := ctxNext
-	ctxReg[id] = h
-	ctxMu.Unlock()
-
-	// 在 C 堆上分配注册表键，供回调反查。
-	idPtr := C.malloc(C.size_t(unsafe.Sizeof(C.int(0))))
-	if idPtr == nil {
-		ctxMu.Lock()
-		delete(ctxReg, id)
-		ctxMu.Unlock()
-		return nil, nil
-	}
-	*(*C.int)(idPtr) = C.int(id)
-
+// newGPContext 创建 libgphoto2 的 GPContext。
+//
+// 这里不注册 C→Go 回调钩子：正常相机操作不依赖回调，而不导出 C→Go 回调函数可以让
+// 交叉编译（含 Android NDK）下的 cgo 更稳定。若后续要把 libgphoto2 的错误 / 状态
+// 消息转发到 logger，可在本文件用 //export 定义回调并注册到对应 set_*_func。
+func newGPContext() (*C.GPContext, error) {
 	ctx := C.gp_context_new()
 	if ctx == nil {
-		unregisterContext(id, idPtr)
-		return nil, nil
+		return nil, errors.New("failed to create gphoto2 GPContext")
 	}
-	// Keep the libgphoto2 context alive without registering Go callback hooks.
-	// The Android binary does not require context callbacks during normal camera operations,
-	// and avoiding exported C->Go callback functions is the most reliable path for cgo
-	// under the Android NDK cross toolchain.
-	C.gp_context_set_error_func(ctx, nil, nil)
-	C.gp_context_set_status_func(ctx, nil, nil)
-	C.gp_context_set_message_func(ctx, nil, nil)
-	return ctx, idPtr
+	return ctx, nil
 }
 
-// freeGPContext 释放 GPContext 并注销回调。
-func freeGPContext(ctx *C.GPContext, idPtr unsafe.Pointer) {
-	if idPtr != nil {
-		id := int(*(*C.int)(idPtr))
-		unregisterContext(id, idPtr)
-	}
+// freeGPContext 释放 GPContext 引用。
+func freeGPContext(ctx *C.GPContext) {
 	if ctx != nil {
 		C.gp_context_unref(ctx)
-	}
-}
-
-func unregisterContext(id int, idPtr unsafe.Pointer) {
-	ctxMu.Lock()
-	delete(ctxReg, id)
-	ctxMu.Unlock()
-	if idPtr != nil {
-		C.free(idPtr)
-	}
-}
-
-// dispatch 根据回调数据反查处理器并调用。
-func dispatch(data unsafe.Pointer, invoke func(*contextHandlers)) {
-	if data == nil {
-		return
-	}
-	id := int(*(*C.int)(data))
-	ctxMu.RLock()
-	h, ok := ctxReg[id]
-	ctxMu.RUnlock()
-	if ok && h != nil {
-		invoke(h)
 	}
 }

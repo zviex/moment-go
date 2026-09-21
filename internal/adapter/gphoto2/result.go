@@ -7,11 +7,31 @@ import (
 	"ci.zevix.uk/moment-go/internal/domain"
 )
 
-// libgphoto2 返回码（gphoto2-result.h）。负值表示错误，0 表示成功。
+// libgphoto2 返回码，取值与 libgphoto2-android/include/gphoto2/gphoto2-result.h、
+// gphoto2-port-result.h 一致。负值表示错误，0（GP_OK）表示成功。
 const (
 	gpOK                     = 0
 	gpError                  = -1
-	gpErrorNoMemory          = -2
+	gpErrorBadParameters     = -2
+	gpErrorNoMemory          = -3
+	gpErrorLibrary           = -4
+	gpErrorUnknownPort       = -5
+	gpErrorNotSupported      = -6
+	gpErrorIO                = -7
+	gpErrorFixedLimit        = -8
+	gpErrorTimeout           = -10
+	gpErrorIOSupportedSerial = -20
+	gpErrorIOSupportedUSB    = -21
+	gpErrorIOInit            = -31
+	gpErrorIORead            = -34
+	gpErrorIOWrite           = -35
+	gpErrorIOUpdate          = -37
+	gpErrorIOSerialSpeed     = -41
+	gpErrorIOUSBClearHalt    = -51
+	gpErrorIOUSBFind         = -52
+	gpErrorIOUSBClaim        = -53
+	gpErrorIOLock            = -60
+	gpErrorHAL               = -70
 	gpErrorCorruptedData     = -102
 	gpErrorFileExists        = -103
 	gpErrorModelNotFound     = -105
@@ -24,26 +44,31 @@ const (
 	gpErrorCameraError       = -113
 	gpErrorOSFailure         = -114
 	gpErrorNoSpace           = -115
-	gpErrorIO                = -116
-	gpErrorTimeout           = -118
-	gpErrorNotSupported      = -119
-	gpErrorIORead            = -121
-	gpErrorIOWrite           = -122
-	gpErrorIOUSBClaim        = -126
-	gpErrorIOLock            = -127
-	gpErrorIOPTPCancel       = -143
-	gpErrorIOPTPPermission   = -144
-	gpErrorIOPTPTimeout      = -146
-	gpErrorIOPTPRefused      = -147
-	gpErrorIOPTPEOF          = -148
-	gpErrorIOPTPDeviceBusy   = -149
-	gpErrorIOPTPUnknown      = -150
 )
 
 // resultName 为常见返回码提供可读名称（调试用）。
 var resultName = map[int]string{
 	gpError:                  "GP_ERROR",
+	gpErrorBadParameters:     "GP_ERROR_BAD_PARAMETERS",
 	gpErrorNoMemory:          "GP_ERROR_NO_MEMORY",
+	gpErrorLibrary:           "GP_ERROR_LIBRARY",
+	gpErrorUnknownPort:       "GP_ERROR_UNKNOWN_PORT",
+	gpErrorNotSupported:      "GP_ERROR_NOT_SUPPORTED",
+	gpErrorIO:                "GP_ERROR_IO",
+	gpErrorFixedLimit:        "GP_ERROR_FIXED_LIMIT_EXCEEDED",
+	gpErrorTimeout:           "GP_ERROR_TIMEOUT",
+	gpErrorIOSupportedSerial: "GP_ERROR_IO_SUPPORTED_SERIAL",
+	gpErrorIOSupportedUSB:    "GP_ERROR_IO_SUPPORTED_USB",
+	gpErrorIOInit:            "GP_ERROR_IO_INIT",
+	gpErrorIORead:            "GP_ERROR_IO_READ",
+	gpErrorIOWrite:           "GP_ERROR_IO_WRITE",
+	gpErrorIOUpdate:          "GP_ERROR_IO_UPDATE",
+	gpErrorIOSerialSpeed:     "GP_ERROR_IO_SERIAL_SPEED",
+	gpErrorIOUSBClearHalt:    "GP_ERROR_IO_USB_CLEAR_HALT",
+	gpErrorIOUSBFind:         "GP_ERROR_IO_USB_FIND",
+	gpErrorIOUSBClaim:        "GP_ERROR_IO_USB_CLAIM",
+	gpErrorIOLock:            "GP_ERROR_IO_LOCK",
+	gpErrorHAL:               "GP_ERROR_HAL",
 	gpErrorCorruptedData:     "GP_ERROR_CORRUPTED_DATA",
 	gpErrorFileExists:        "GP_ERROR_FILE_EXISTS",
 	gpErrorModelNotFound:     "GP_ERROR_MODEL_NOT_FOUND",
@@ -56,20 +81,6 @@ var resultName = map[int]string{
 	gpErrorCameraError:       "GP_ERROR_CAMERA_ERROR",
 	gpErrorOSFailure:         "GP_ERROR_OS_FAILURE",
 	gpErrorNoSpace:           "GP_ERROR_NO_SPACE",
-	gpErrorIO:                "GP_ERROR_IO",
-	gpErrorTimeout:           "GP_ERROR_TIMEOUT",
-	gpErrorNotSupported:      "GP_ERROR_NOT_SUPPORTED",
-	gpErrorIORead:            "GP_ERROR_IO_READ",
-	gpErrorIOWrite:           "GP_ERROR_IO_WRITE",
-	gpErrorIOUSBClaim:        "GP_ERROR_IO_USB_CLAIM",
-	gpErrorIOLock:            "GP_ERROR_IO_LOCK",
-	gpErrorIOPTPCancel:       "GP_ERROR_IO_PTP_CANCEL",
-	gpErrorIOPTPPermission:   "GP_ERROR_IO_PTP_PERMISSION",
-	gpErrorIOPTPTimeout:      "GP_ERROR_IO_PTP_TIMEOUT",
-	gpErrorIOPTPRefused:      "GP_ERROR_IO_PTP_REFUSED",
-	gpErrorIOPTPEOF:          "GP_ERROR_IO_PTP_EOF",
-	gpErrorIOPTPDeviceBusy:   "GP_ERROR_IO_PTP_DEVICEBUSY",
-	gpErrorIOPTPUnknown:      "GP_ERROR_IO_PTP_UNKNOWN",
 }
 
 // resultToError 将 libgphoto2 返回码转换为 Go 错误。
@@ -86,11 +97,11 @@ func resultToError(code int) error {
 		sentinel = domain.ErrDirectoryNotFound
 	case gpErrorFileNotFound:
 		sentinel = domain.ErrFileNotFound
-	case gpErrorCameraBusy, gpErrorIOPTPDeviceBusy:
+	case gpErrorCameraBusy:
 		sentinel = domain.ErrCameraBusy
-	case gpErrorCancel, gpErrorIOPTPCancel:
+	case gpErrorCancel:
 		sentinel = domain.ErrCancelled
-	case gpErrorOSFailure:
+	case gpErrorOSFailure, gpErrorIO:
 		sentinel = domain.ErrOSFailure
 	case gpErrorNotSupported:
 		sentinel = domain.ErrUnsupported

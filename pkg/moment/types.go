@@ -15,8 +15,12 @@ import (
 
 // 公共错误哨兵：供调用方做错误分类。
 var (
-	// ErrUnsupportedPlatform 当前平台不提供 libgphoto2 后端（仅 Android arm64）。
-	ErrUnsupportedPlatform = domain.ErrUnsupportedPlatform
+	// ErrBackendUnavailable 当前构建不含 libgphoto2 后端（例如 CGO_ENABLED=0）。
+	ErrBackendUnavailable = domain.ErrBackendUnavailable
+	// ErrUnsupportedPlatform 已废弃，等价于 ErrBackendUnavailable。
+	//
+	// Deprecated: 使用 ErrBackendUnavailable。
+	ErrUnsupportedPlatform = domain.ErrBackendUnavailable
 	// ErrNotConnected 会话未建立或已断开。
 	ErrNotConnected = domain.ErrNotConnected
 	// ErrAlreadyConnected 重复连接。
@@ -33,12 +37,18 @@ var (
 	ErrCancelled = domain.ErrCancelled
 )
 
-// IsUnsupported 判断错误是否为“后端在当前平台不可用”。
-func IsUnsupported(err error) bool { return errors.Is(err, ErrUnsupportedPlatform) }
+// IsBackendUnavailable 判断错误是否为“当前构建不含 libgphoto2 后端”。
+func IsBackendUnavailable(err error) bool { return errors.Is(err, ErrBackendUnavailable) }
+
+// IsUnsupported 已废弃，等价于 IsBackendUnavailable。
+//
+// Deprecated: 使用 IsBackendUnavailable。
+func IsUnsupported(err error) bool { return IsBackendUnavailable(err) }
 
 // ConnectOptions 是连接参数。
 type ConnectOptions struct {
-	// Type 连接方式，默认 ConnectPTPIP 之外的语义见各字段。
+	// Type 连接方式：CONNECTION_MODE_AUTO / USB / PTPIP，
+	// 留空（UNSPECIFIED）等同自动探测；各方式的字段语义见下方说明。
 	Type connectionv1.ConnectionMode
 	// Model 相机模型名；PTP/IP 缺省为 "PTP/IP Camera"。
 	Model string

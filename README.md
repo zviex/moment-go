@@ -1,15 +1,18 @@
 # moment-go
 
-面向 Android 的 **libgphoto2 Go 模块**：将 `libgphoto2-android`（预编译的 Android arm64 后端）映射为简洁的 Go API，并围绕**相机会话生命周期**提供四大能力：
+**libgphoto2 的 Go 绑定模块**：把 libgphoto2 的 C API 映射为简洁的 Go API，并围绕**相机会话生命周期**提供四大能力：
 
 1. **连接相机** —— 支持 USB 自动探测 / 指定 USB 端口 / **PTP/IP 网络连接**
 2. **预览所有相机内容** —— 递归遍历相机存储目录树
 3. **下载内容** —— 下载相机文件到内存或写入任意 `io.Writer`
 4. **解析相机信息** —— 摘要、驱动说明、存储信息、配置树
 
-> 本地缺少相机与 Android 测试环境：本模块在非 Android 平台提供 stub 后端
-> （`ErrUnsupportedPlatform`），保证**可编译、可单测、可演示 API 与生命周期流程**；
-> Android 上编译 cgo 后端即可连接真实相机。
+适配层不做平台 / 架构特化：头文件统一取自仓库内的 `libgphoto2-android/include`
+（与预编译库同版本，本身即跨平台），链接与运行期使用**当前系统安装的 libgphoto2**；
+只有编译 Android 时才改用 `libgphoto2-android/lib` 中随 APK 打包的 `.so`。
+
+> `CGO_ENABLED=0` 构建时使用桩后端（`ErrBackendUnavailable`），
+> 保证**可编译、可单测、可演示 API 与生命周期流程**。
 
 ## 架构（整洁架构）
 
@@ -19,7 +22,8 @@ graph TD
     B --> C[internal/domain 领域层<br/>实体 · 端口接口]
     B --> D[internal/adapter/gphoto2 适配层<br/>libgphoto2 cgo 绑定]
     C --> D
-    D --> E[libgphoto2-android<br/>预编译 arm64 动态库]
+    D --> E[libgphoto2-android/include<br/>跨平台头文件]
+    D --> F[系统 libgphoto2（Linux / macOS）<br/>或随 APK 打包的 .so（Android）]
 ```
 
 依赖方向由外向内，领域层不依赖任何外部实现；适配层实现领域层定义的端口接口。
@@ -43,11 +47,11 @@ moment-go/
     │   ├── lifecycle.go           # 状态机
     │   └── app.go                 # Connect / ListTree / Download / GetInfo ...
     ├── logging/                   # 跨层日志抽象
-    └── adapter/gphoto2/           # 适配层：cgo 绑定（android）+ stub（其他平台）
-        ├── bindings.go            # #cgo 指令与 C 前导
-        ├── context.go             # GPContext 回调桥接（C→Go）
-        ├── gateway_android.go     # 后端实现（PTP/IP、浏览、下载、解析）
-        ├── gateway_stub.go        # 非 Android 桩实现
+    └── adapter/gphoto2/           # 适配层：cgo 绑定（全平台）+ 桩（CGO_ENABLED=0）
+        ├── bindings.go            # #cgo 指令（头文件 / 链接）
+        ├── context.go             # GPContext 生命周期
+        ├── gateway.go             # cgo 后端实现（PTP/IP、浏览、下载、解析）
+        ├── gateway_stub.go        # 无 cgo 时的默认桩实现
         ├── bootstrap.go           # CAMLIBS / IOLIBS 环境变量
         └── result.go              # 返回码 → 领域错误
 ```
@@ -77,12 +81,14 @@ import (
 	"fmt"
 
 	"ci.zevix.uk/moment-go/pkg/moment"
+	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// 创建客户端。Android 上先解压 .so 再传布局根目录：
+	// 创建客户端。桌面端默认使用系统安装的 libgphoto2；
+	// Android 上先解压 .so，再传入布局根目录：
 	// client, err := moment.New(moment.WithLibraryRoot(filesDir), moment.WithVerboseLog(true))
 	client, err := moment.New()
 	if err != nil {
@@ -91,7 +97,7 @@ func main() {
 
 	// 1) 连接：PTP/IP 网络连接（相机 WiFi/IP 模式）
 	cam, err := client.Connect(ctx, moment.ConnectOptions{
-		Type: moment.ConnectPTPIP,
+		Type: connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP,
 		Host: "192.168.1.100",
 	})
 	if err != nil {
@@ -131,11 +137,13 @@ func main() {
 
 ```go
 // 自动探测（取第一个 USB 相机）
-cam, err := client.Connect(ctx, moment.ConnectOptions{Type: moment.ConnectAuto})
+cam, err := client.Connect(ctx, moment.ConnectOptions{
+	Type: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO,
+})
 
 // 指定端口连接
 cam, err := client.Connect(ctx, moment.ConnectOptions{
-	Type:    moment.ConnectUSB,
+	Type:    connectionv1.ConnectionMode_CONNECTION_MODE_USB,
 	USBPort: "usb:001,002",
 })
 ```
@@ -144,11 +152,41 @@ cam, err := client.Connect(ctx, moment.ConnectOptions{
 
 公共错误哨兵：`moment.ErrNotConnected`、`moment.ErrModelNotFound`、`moment.ErrFileNotFound`、
 `moment.ErrDirectoryNotFound`、`moment.ErrCameraBusy`、`moment.ErrCancelled`、
-`moment.ErrUnsupportedPlatform` 等，可用 `errors.Is` 判断。
+`moment.ErrBackendUnavailable`（旧的 `ErrUnsupportedPlatform` 保留为等价别名）等，
+可用 `errors.Is` 判断。
 
-## Android 构建
+## 构建
 
-`libgphoto2-android` 提供的是 Android **arm64-v8a** 动态库，构建需要 NDK：
+头文件始终取自 `libgphoto2-android/include`；链接与运行期按平台选择：
+宿主（Linux / macOS）用系统安装的 libgphoto2，Android 用随 APK 打包的 `.so`。
+
+### 宿主（Linux / macOS）
+
+```sh
+go build ./...   # CGO_ENABLED=1（默认），链接系统 libgphoto2
+go vet ./...
+go test ./...
+```
+
+需要系统提供可链接的 libgphoto2 与 libltdl（含运行期 camlib / iolib）：
+
+| 平台 | 安装 |
+|---|---|
+| Debian / Ubuntu | `apt-get install libgphoto2-dev libltdl-dev` |
+| macOS (Homebrew) | `brew install libgphoto2 libtool` |
+
+非标准安装前缀用 `CGO_CFLAGS` / `CGO_LDFLAGS` 补充，例如
+`CGO_LDFLAGS="-L/opt/local/lib" go build ./...`（MacPorts）。
+没有 C 工具链或不想链接系统库时，退回桩后端：
+
+```sh
+CGO_ENABLED=0 go build ./...
+```
+
+### Android（arm64）
+
+`libgphoto2-android/lib` 提供 Android **arm64-v8a** 动态库，构建需要 NDK。
+Android 目标下 cgo 会自动把 `-L` 指向 `libgphoto2-android/lib`：
 
 ```sh
 export NDK=$HOME/Library/Android/sdk/ndk/<版本>
@@ -159,8 +197,7 @@ GOOS=android GOARCH=arm64 CGO_ENABLED=1 CC=$CC \
 ```
 
 链接依赖：`libgphoto2.so`、`libgphoto2_port.so`、`libltdl.so`、`libm.so`
-（NDK 提供 `libm/libc/libdl`）。cgo 的 `-I/-L` 已通过 `${SRCDIR}` 相对路径指向
-`libgphoto2-android/{include,lib}`，无需额外设置。
+（NDK 提供 `libm/libc/libdl`）；`-I` 始终通过 `${SRCDIR}` 相对路径指向仓库内头文件。
 
 ## Dev Container（推荐）
 
@@ -170,7 +207,7 @@ GOOS=android GOARCH=arm64 CGO_ENABLED=1 CC=$CC \
 ```sh
 # 进入容器后（VS Code: “Reopen in Container”；Zed 同样支持 .devcontainer）
 
-# ① 宿主（linux/amd64）构建 + 单测（走桩后端）
+# ① 宿主（linux/amd64）构建 + 单测（链接系统 libgphoto2，容器内已装 libgphoto2-dev）
 go build ./... && go test ./...
 
 # ② Android (arm64) 交叉编译（自动使用 NDK clang 链接 libgphoto2）
@@ -194,16 +231,19 @@ Android 交叉编译（生成 `bin/app-android-arm64`），全部通过才视为
 对应值；或直接改 `.devcontainer/Dockerfile` 的 `ARG` 默认值。
 
 **编辑器（gopls）**：容器内 gopls 以 `CGO_ENABLED=0` 运行（见 `customizations`），
-避免分析 android 配置时依赖本机之外的编译器；真机构建仍由命令行 `CC` 驱动。
+此时分析的是桩后端，避免编辑器依赖 C 工具链；真机构建仍由命令行 `CC` 驱动。
 
 ## 运行时部署（Android）
 
-libgphoto2 通过环境变量定位插件目录（由 `moment.WithLibraryRoot` 设置）：
+libgphoto2 通过环境变量定位驱动（插件）目录。宿主平台无需设置——libgphoto2 会使用
+自身编译期默认路径搜索系统安装的驱动；Android 上由 `moment.WithLibraryRoot` 设置：
 
 ```
-CAMLIBS  = <root>/libgphoto2/2.5.34.1/        # ptp2.so 等相机驱动
-IOLIBS   = <root>/libgphoto2_port/0.12.2/     # ptpip.so、usb1.so 等端口驱动
+CAMLIBS  = <root>/libgphoto2/<版本>/        # ptp2.so 等相机驱动
+IOLIBS   = <root>/libgphoto2_port/<版本>/   # ptpip.so、usb1.so 等端口驱动
 ```
+
+版本目录由 `Bootstrap` 自动探测（如 `2.5.34.1` / `0.12.2`），无需硬编码。
 
 将 `libgphoto2-android/jniLibs/arm64-v8a/` 中的 `.so` 打包进 APK 的 `jniLibs`
 （确保 `libgphoto2.so`、`libgphoto2_port.so`、`libltdl.so`、`libusb-1.0.so` 在 APK 内），
@@ -224,19 +264,19 @@ IOLIBS   = <root>/libgphoto2_port/0.12.2/     # ptpip.so、usb1.so 等端口驱�
 
 ## 验证
 
-本地（无相机 / 无 Android）执行：
+本地（无相机）执行：
 
 ```sh
-go build ./...   # 桩后端，全平台可编译
-go vet ./...     # 静态检查
-go test ./...    # 生命周期 / 目录树遍历 / 下载 / 信息聚合 / 错误映射 单测
-go run ./app     # 演示 API 与生命周期流程（桩环境返回 ErrUnsupportedPlatform）
+go build ./...                  # 链接系统 libgphoto2
+go vet ./...                    # 静态检查（含 cgo 绑定）
+go test ./...                   # 生命周期 / 目录树遍历 / 下载 / 信息聚合 / 错误映射 / 驱动目录探测
+CGO_ENABLED=0 go build ./...    # 桩后端，无 C 工具链也可编译
+go run ./app                    # 对外 API 与生命周期演示（未接相机时 Detect 返回空列表）
 ```
-
-C API 使用正确性已用宿主 clang 对照真实头文件做 `-fsyntax-only` 校验。
 
 ## 限制与后续
 
-- 后端仅在 Android (arm64) 编译；如需 iOS/桌面端，需另行交叉编译 libgphoto2。
+- cgo 构建要求系统存在 libgphoto2 / libltdl 的开发包（提供链接名）；无 C 工具链时
+  用 `CGO_ENABLED=0` 走桩后端。
 - 配置树当前为只读解析；写配置（`SetConfig`）与拍照（`Capture`）可作为后续用例扩展。
 - 下载为整体内存传输；超大文件可基于 `gp_camera_file_read` 分块流式化。

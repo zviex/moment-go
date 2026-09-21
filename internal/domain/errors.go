@@ -5,8 +5,9 @@ import "errors"
 // 领域层错误：用例层与适配层统一通过这些哨兵错误做错误分类，
 // delivery 层（pkg/moment）可将其映射为对用户友好的信息。
 var (
-	// ErrUnsupportedPlatform 当前平台不提供 libgphoto2 后端。
-	ErrUnsupportedPlatform = errors.New("libgphoto2 backend is only available on Android (arm64)")
+	// ErrBackendUnavailable 当前构建不包含 libgphoto2 后端
+	// （未启用 cgo，或未链接到 libgphoto2 动态库）。
+	ErrBackendUnavailable = errors.New("libgphoto2 backend is unavailable: build with CGO_ENABLED=1 against libgphoto2")
 
 	// ErrNotConnected 会话未建立或已断开。
 	ErrNotConnected = errors.New("camera is not connected")

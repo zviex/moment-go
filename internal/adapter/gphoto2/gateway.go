@@ -1,11 +1,8 @@
-//go:build android && arm64
+//go:build cgo
 
 package gphoto2
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../../../libgphoto2-android/include
-#cgo LDFLAGS: -L${SRCDIR}/../../../libgphoto2-android/lib -lgphoto2 -lgphoto2_port -lltdl -lm
-
 #include <gphoto2/gphoto2.h>
 #include <gphoto2/gphoto2-camera.h>
 #include <gphoto2/gphoto2-context.h>
@@ -19,6 +16,9 @@ package gphoto2
 #include <stdlib.h>
 #include <string.h>
 
+// 复制 CameraFileInfo 中的 MIME 类型。
+// 注意：info->file.type 的字段名 type 是 Go 关键字，cgo 无法直接访问，
+// 因此通过 C 辅助函数读取；C 前导块按文件独立编译，辅助函数需与调用方同文件。
 static void gp_file_info_mime(const CameraFileInfo *info, char *buf, size_t bufsize) {
 	if (!info || !buf || bufsize <= 0) return;
 	strncpy(buf, info->file.type, bufsize - 1);
@@ -40,6 +40,7 @@ import (
 
 	"ci.zevix.uk/moment-go/internal/domain"
 	"ci.zevix.uk/moment-go/internal/logging"
+	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
 )
 
 // 文件信息字段位掩码（gphoto2-filesys.h）。
@@ -66,35 +67,28 @@ const defaultPTPIPPort = 15740
 const ptpipCameraModel = "PTP/IP Camera"
 
 // Gateway 实现 domain.Gateway：通过 libgphoto2 C API 探测与连接相机。
+// 与平台无关：Linux / macOS 使用系统安装的 libgphoto2，Android 使用随包 .so。
 type Gateway struct {
-	logger  logging.Logger
-	ctx     *C.GPContext
-	ctxData unsafe.Pointer
+	logger logging.Logger
+	ctx    *C.GPContext
 }
 
-// NewGateway 创建网关，初始化 GPContext 并把回调转发到 logger。
+// NewGateway 创建网关并初始化 GPContext。
 func NewGateway(logger logging.Logger) (*Gateway, error) {
 	if logger == nil {
 		logger = logging.Nop{}
 	}
-	g := &Gateway{logger: logger}
-	h := &contextHandlers{
-		errorFunc:   func(msg string) { logger.Errorf("gphoto2: %s", msg) },
-		statusFunc:  func(msg string) { logger.Debugf("gphoto2: %s", msg) },
-		messageFunc: func(msg string) { logger.Debugf("gphoto2: %s", msg) },
+	ctx, err := newGPContext()
+	if err != nil {
+		return nil, err
 	}
-	ctx, data := newGPContext(h)
-	if ctx == nil {
-		return nil, errors.New("failed to create gphoto2 GPContext")
-	}
-	g.ctx, g.ctxData = ctx, data
-	return g, nil
+	return &Gateway{logger: logger, ctx: ctx}, nil
 }
 
 // Close 释放 GPContext。
 func (g *Gateway) Close() error {
-	freeGPContext(g.ctx, g.ctxData)
-	g.ctx, g.ctxData = nil, nil
+	freeGPContext(g.ctx)
+	g.ctx = nil
 	return nil
 }
 
@@ -150,9 +144,9 @@ func (g *Gateway) Detect(ctx context.Context) ([]domain.DetectedCamera, error) {
 }
 
 // Connect 按选项建立相机连接，支持：
-//   - ConnectAuto: 自动探测 USB 相机（取第一个）
-//   - ConnectUSB:  指定 USB 端口，或按模型匹配探测结果
-//   - ConnectPTPIP: PTP/IP 网络连接（默认模型 "PTP/IP Camera"）
+//   - CONNECTION_MODE_AUTO: 自动探测相机（取第一个）
+//   - CONNECTION_MODE_USB:  指定 USB 端口，或按模型匹配探测结果
+//   - CONNECTION_MODE_PTPIP: PTP/IP 网络连接（默认模型 "PTP/IP Camera"）
 func (g *Gateway) Connect(ctx context.Context, opts domain.ConnectOptions) (domain.CameraSession, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -163,10 +157,12 @@ func (g *Gateway) Connect(ctx context.Context, opts domain.ConnectOptions) (doma
 	}
 
 	// 1. 加载端口信息列表并定位端口。
-	portInfo, err := g.lookupPort(portPath)
+	// 端口信息由列表持有，需保证列表在 gp_camera_init 之前一直存活。
+	portList, portInfo, err := g.lookupPort(portPath)
 	if err != nil {
 		return nil, err
 	}
+	defer C.gp_port_info_list_free(portList)
 
 	// 2. 加载能力列表并定位相机模型。
 	abilities, err := g.lookupAbilities(model)
@@ -212,7 +208,7 @@ func (g *Gateway) Connect(ctx context.Context, opts domain.ConnectOptions) (doma
 // resolveTarget 把连接选项归一化为 (端口路径, 模型名)。
 func (g *Gateway) resolveTarget(ctx context.Context, opts domain.ConnectOptions) (string, string, error) {
 	switch opts.Type {
-	case domain.ConnectPTPIP:
+	case connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP:
 		addr, existingPort, err := splitHostPort(strings.TrimSpace(opts.Host))
 		if err != nil {
 			return "", "", err
@@ -231,7 +227,7 @@ func (g *Gateway) resolveTarget(ctx context.Context, opts domain.ConnectOptions)
 		}
 		return portPath, model, nil
 
-	case domain.ConnectUSB:
+	case connectionv1.ConnectionMode_CONNECTION_MODE_USB:
 		portPath := strings.TrimSpace(opts.USBPort)
 		model := strings.TrimSpace(opts.Model)
 		if portPath == "" {
@@ -267,7 +263,7 @@ func (g *Gateway) resolveTarget(ctx context.Context, opts domain.ConnectOptions)
 		}
 		return portPath, model, nil
 
-	default: // ConnectAuto
+	default: // CONNECTION_MODE_AUTO / UNSPECIFIED：自动探测第一个相机
 		cams, err := g.Detect(ctx)
 		if err != nil {
 			return "", "", err
@@ -280,14 +276,16 @@ func (g *Gateway) resolveTarget(ctx context.Context, opts domain.ConnectOptions)
 }
 
 // lookupPort 在端口列表中定位指定路径的端口。
-func (g *Gateway) lookupPort(portPath string) (C.GPPortInfo, error) {
+// 返回的端口信息由列表持有：调用方必须保持列表存活（至少到 gp_camera_init 之后），
+// 并在使用完毕后释放列表。
+func (g *Gateway) lookupPort(portPath string) (*C.GPPortInfoList, C.GPPortInfo, error) {
 	var pl *C.GPPortInfoList
 	if err := resultToError(int(C.gp_port_info_list_new(&pl))); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	defer C.gp_port_info_list_free(pl)
 	if err := resultToError(int(C.gp_port_info_list_load(pl))); err != nil {
-		return nil, err
+		C.gp_port_info_list_free(pl)
+		return nil, nil, err
 	}
 
 	portC := C.CString(portPath)
@@ -295,22 +293,25 @@ func (g *Gateway) lookupPort(portPath string) (C.GPPortInfo, error) {
 
 	idx := C.gp_port_info_list_lookup_path(pl, portC)
 	if idx < 0 {
-		return nil, fmt.Errorf("port %q not found", portPath)
+		C.gp_port_info_list_free(pl)
+		return nil, nil, fmt.Errorf("port %q not found", portPath)
 	}
 	var info C.GPPortInfo
 	if err := resultToError(int(C.gp_port_info_list_get_info(pl, idx, &info))); err != nil {
-		return nil, err
+		C.gp_port_info_list_free(pl)
+		return nil, nil, err
 	}
 	// 若命中正则匹配器（路径形如 "^ptpip:"），把实际路径写回端口信息，
 	// 保证 ptp2 驱动能解析出主机地址。
+	// 注意：gp_port_info_get_path 返回端口信息内部指针，不能 free；
+	// gp_port_info_set_path 会复制传入的字符串。
 	var path *C.char
 	if C.gp_port_info_get_path(info, &path) == 0 && path != nil {
 		if strings.HasPrefix(C.GoString(path), "^") {
 			C.gp_port_info_set_path(info, portC)
 		}
-		C.free(unsafe.Pointer(path))
 	}
-	return info, nil
+	return pl, info, nil
 }
 
 // lookupAbilities 在能力列表中定位相机模型。

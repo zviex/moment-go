@@ -1,46 +1,34 @@
-//go:build android && arm64
+//go:build cgo
 
 // Package gphoto2 是 libgphoto2 C API 的 cgo 绑定与适配层实现。
-// 仅在 Android arm64 上编译（libgphoto2-android 提供 arm64-v8a 动态库）；
-// 其他平台/架构由 gateway_stub*.go 提供空实现。
 //
-// # 链接说明
+// libgphoto2 本身支持 Linux / macOS / Android 等平台，libgphoto2-android/include
+// 下的头文件同样是跨平台的，因此绑定代码在所有启用 cgo 的目标上编译，
+// 不再针对 Android / arm64 做特殊处理。CGO_ENABLED=0 时由 gateway_stub.go
+// 提供默认桩实现，保证模块仍可编译与单测。
 //
-// 仓库内的 libgphoto2-android 目录提供了预编译的 arm64-v8a 库：
+// # 头文件
 //
-//	libgphoto2-android/include     # 头文件
-//	libgphoto2-android/lib         # 动态库（libgphoto2.so 等）与 camlib/iolib 子目录
+// 编译期统一使用仓库内的头文件（与预编译库同版本、跨平台）：
 //
-// 构建时要求 Android NDK 提供的 clang（GOOS=android GOARCH=arm64 CGO_ENABLED=1），
-// 例如：
+//	libgphoto2-android/include/gphoto2/*.h
 //
-//	GOOS=android GOARCH=arm64 CGO_ENABLED=1 CC=$NDK/toolchains/llvm/prebuilt/*/bin/aarch64-linux-android21-clang go build ./...
+// 因此宿主机不需要安装 libgphoto2 的开发头文件。
+//
+// # 链接
+//
+//   - linux / darwin：链接当前系统安装的 libgphoto2（默认搜索系统库路径，
+//     macOS 下额外搜索 /opt/homebrew/lib 与 /usr/local/lib），需要 libgphoto2
+//     与 libltdl 的开发包提供 .so / .dylib 链接名；运行期同样使用系统的 camlib / iolib。
+//   - android：链接 libgphoto2-android/lib 下随 APK 打包的 .so。
+//
+// 非标准安装前缀可通过 CGO_CFLAGS / CGO_LDFLAGS 补充。
 package gphoto2
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../../../libgphoto2-android/include
-#cgo LDFLAGS: -L${SRCDIR}/../../../libgphoto2-android/lib -lgphoto2 -lgphoto2_port -lltdl -lm
-
-#include <gphoto2/gphoto2.h>
-#include <gphoto2/gphoto2-camera.h>
-#include <gphoto2/gphoto2-context.h>
-#include <gphoto2/gphoto2-filesys.h>
-#include <gphoto2/gphoto2-file.h>
-#include <gphoto2/gphoto2-list.h>
-#include <gphoto2/gphoto2-abilities-list.h>
-#include <gphoto2/gphoto2-port-info-list.h>
-#include <gphoto2/gphoto2-result.h>
-#include <gphoto2/gphoto2-widget.h>
-#include <stdlib.h>
-#include <string.h>
-
-// 复制 CameraFileInfo 中的 MIME 类型。
-// 注意：info->file.type 的字段名 type 是 Go 关键字，cgo 无法直接访问，
-// 因此通过 C 辅助函数读取。
-static void gp_file_info_mime(const CameraFileInfo *info, char *buf, size_t bufsize) {
-	if (!info || !buf || bufsize <= 0) return;
-	strncpy(buf, info->file.type, bufsize - 1);
-	buf[bufsize - 1] = '\0';
-}
+#cgo LDFLAGS: -lgphoto2 -lgphoto2_port -lltdl -lm
+#cgo darwin LDFLAGS: -L/opt/homebrew/lib -L/usr/local/lib
+#cgo android LDFLAGS: -L${SRCDIR}/../../../libgphoto2-android/lib
 */
 import "C"

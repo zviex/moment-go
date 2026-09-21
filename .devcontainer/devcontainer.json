@@ -32,6 +32,8 @@
         "go.useLanguageServer": true,
         "gopls": {
           "env": {
+            // 编辑器内以桩后端（CGO_ENABLED=0）分析，避免依赖 C 工具链；
+            // 真机构建仍由命令行 CC 驱动（见 README 构建章节）。
             "CGO_ENABLED": "0"
           }
         }
