@@ -274,6 +274,78 @@ func (x *ConnectCameraResponse) GetPort() string {
 	return ""
 }
 
+type DisconnectCameraRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DisconnectCameraRequest) Reset() {
+	*x = DisconnectCameraRequest{}
+	mi := &file_connection_v1_connection_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisconnectCameraRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisconnectCameraRequest) ProtoMessage() {}
+
+func (x *DisconnectCameraRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_connection_v1_connection_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisconnectCameraRequest.ProtoReflect.Descriptor instead.
+func (*DisconnectCameraRequest) Descriptor() ([]byte, []int) {
+	return file_connection_v1_connection_proto_rawDescGZIP(), []int{4}
+}
+
+type DisconnectCameraResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DisconnectCameraResponse) Reset() {
+	*x = DisconnectCameraResponse{}
+	mi := &file_connection_v1_connection_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisconnectCameraResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisconnectCameraResponse) ProtoMessage() {}
+
+func (x *DisconnectCameraResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_connection_v1_connection_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisconnectCameraResponse.ProtoReflect.Descriptor instead.
+func (*DisconnectCameraResponse) Descriptor() ([]byte, []int) {
+	return file_connection_v1_connection_proto_rawDescGZIP(), []int{5}
+}
+
 var File_connection_v1_connection_proto protoreflect.FileDescriptor
 
 const file_connection_v1_connection_proto_rawDesc = "" +
@@ -289,15 +361,18 @@ const file_connection_v1_connection_proto_rawDesc = "" +
 	"\tport_path\x18\x04 \x01(\tR\bportPath\"A\n" +
 	"\x15ConnectCameraResponse\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x12\x12\n" +
-	"\x04port\x18\x02 \x01(\tR\x04port*\x7f\n" +
+	"\x04port\x18\x02 \x01(\tR\x04port\"\x19\n" +
+	"\x17DisconnectCameraRequest\"\x1a\n" +
+	"\x18DisconnectCameraResponse*\x7f\n" +
 	"\x0eConnectionMode\x12\x1f\n" +
 	"\x1bCONNECTION_MODE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14CONNECTION_MODE_AUTO\x10\x01\x12\x17\n" +
 	"\x13CONNECTION_MODE_USB\x10\x02\x12\x19\n" +
-	"\x15CONNECTION_MODE_PTPIP\x10\x032\xd4\x01\n" +
+	"\x15CONNECTION_MODE_PTPIP\x10\x032\xb9\x02\n" +
 	"\x17CameraConnectionService\x12]\n" +
 	"\x0eInitlizeCamera\x12$.connection.v1.InitlizeCameraRequest\x1a%.connection.v1.InitlizeCameraResponse\x12Z\n" +
-	"\rConnectCamera\x12#.connection.v1.ConnectCameraRequest\x1a$.connection.v1.ConnectCameraResponseB\xb3\x01\n" +
+	"\rConnectCamera\x12#.connection.v1.ConnectCameraRequest\x1a$.connection.v1.ConnectCameraResponse\x12c\n" +
+	"\x10DisconnectCamera\x12&.connection.v1.DisconnectCameraRequest\x1a'.connection.v1.DisconnectCameraResponseB\xb3\x01\n" +
 	"\x11com.connection.v1B\x0fConnectionProtoP\x01Z8ci.zevix.uk/moment-go/protogo/connection/v1;connectionv1\xa2\x02\x03CXX\xaa\x02\rConnection.V1\xca\x02\rConnection\\V1\xe2\x02\x19Connection\\V1\\GPBMetadata\xea\x02\x0eConnection::V1b\x06proto3"
 
 var (
@@ -313,24 +388,28 @@ func file_connection_v1_connection_proto_rawDescGZIP() []byte {
 }
 
 var file_connection_v1_connection_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_connection_v1_connection_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_connection_v1_connection_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_connection_v1_connection_proto_goTypes = []any{
-	(ConnectionMode)(0),            // 0: connection.v1.ConnectionMode
-	(*InitlizeCameraRequest)(nil),  // 1: connection.v1.InitlizeCameraRequest
-	(*InitlizeCameraResponse)(nil), // 2: connection.v1.InitlizeCameraResponse
-	(*ConnectCameraRequest)(nil),   // 3: connection.v1.ConnectCameraRequest
-	(*ConnectCameraResponse)(nil),  // 4: connection.v1.ConnectCameraResponse
-	(*v1.Config)(nil),              // 5: config.v1.Config
+	(ConnectionMode)(0),              // 0: connection.v1.ConnectionMode
+	(*InitlizeCameraRequest)(nil),    // 1: connection.v1.InitlizeCameraRequest
+	(*InitlizeCameraResponse)(nil),   // 2: connection.v1.InitlizeCameraResponse
+	(*ConnectCameraRequest)(nil),     // 3: connection.v1.ConnectCameraRequest
+	(*ConnectCameraResponse)(nil),    // 4: connection.v1.ConnectCameraResponse
+	(*DisconnectCameraRequest)(nil),  // 5: connection.v1.DisconnectCameraRequest
+	(*DisconnectCameraResponse)(nil), // 6: connection.v1.DisconnectCameraResponse
+	(*v1.Config)(nil),                // 7: config.v1.Config
 }
 var file_connection_v1_connection_proto_depIdxs = []int32{
-	5, // 0: connection.v1.InitlizeCameraRequest.cfg:type_name -> config.v1.Config
+	7, // 0: connection.v1.InitlizeCameraRequest.cfg:type_name -> config.v1.Config
 	0, // 1: connection.v1.ConnectCameraRequest.mode:type_name -> connection.v1.ConnectionMode
 	1, // 2: connection.v1.CameraConnectionService.InitlizeCamera:input_type -> connection.v1.InitlizeCameraRequest
 	3, // 3: connection.v1.CameraConnectionService.ConnectCamera:input_type -> connection.v1.ConnectCameraRequest
-	2, // 4: connection.v1.CameraConnectionService.InitlizeCamera:output_type -> connection.v1.InitlizeCameraResponse
-	4, // 5: connection.v1.CameraConnectionService.ConnectCamera:output_type -> connection.v1.ConnectCameraResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
+	5, // 4: connection.v1.CameraConnectionService.DisconnectCamera:input_type -> connection.v1.DisconnectCameraRequest
+	2, // 5: connection.v1.CameraConnectionService.InitlizeCamera:output_type -> connection.v1.InitlizeCameraResponse
+	4, // 6: connection.v1.CameraConnectionService.ConnectCamera:output_type -> connection.v1.ConnectCameraResponse
+	6, // 7: connection.v1.CameraConnectionService.DisconnectCamera:output_type -> connection.v1.DisconnectCameraResponse
+	5, // [5:8] is the sub-list for method output_type
+	2, // [2:5] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
 	2, // [2:2] is the sub-list for extension extendee
 	0, // [0:2] is the sub-list for field type_name
@@ -347,7 +426,7 @@ func file_connection_v1_connection_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_connection_v1_connection_proto_rawDesc), len(file_connection_v1_connection_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CameraConnectionService_InitlizeCamera_FullMethodName = "/connection.v1.CameraConnectionService/InitlizeCamera"
-	CameraConnectionService_ConnectCamera_FullMethodName  = "/connection.v1.CameraConnectionService/ConnectCamera"
+	CameraConnectionService_InitlizeCamera_FullMethodName   = "/connection.v1.CameraConnectionService/InitlizeCamera"
+	CameraConnectionService_ConnectCamera_FullMethodName    = "/connection.v1.CameraConnectionService/ConnectCamera"
+	CameraConnectionService_DisconnectCamera_FullMethodName = "/connection.v1.CameraConnectionService/DisconnectCamera"
 )
 
 // CameraConnectionServiceClient is the client API for CameraConnectionService service.
@@ -29,6 +30,7 @@ const (
 type CameraConnectionServiceClient interface {
 	InitlizeCamera(ctx context.Context, in *InitlizeCameraRequest, opts ...grpc.CallOption) (*InitlizeCameraResponse, error)
 	ConnectCamera(ctx context.Context, in *ConnectCameraRequest, opts ...grpc.CallOption) (*ConnectCameraResponse, error)
+	DisconnectCamera(ctx context.Context, in *DisconnectCameraRequest, opts ...grpc.CallOption) (*DisconnectCameraResponse, error)
 }
 
 type cameraConnectionServiceClient struct {
@@ -59,12 +61,23 @@ func (c *cameraConnectionServiceClient) ConnectCamera(ctx context.Context, in *C
 	return out, nil
 }
 
+func (c *cameraConnectionServiceClient) DisconnectCamera(ctx context.Context, in *DisconnectCameraRequest, opts ...grpc.CallOption) (*DisconnectCameraResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DisconnectCameraResponse)
+	err := c.cc.Invoke(ctx, CameraConnectionService_DisconnectCamera_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CameraConnectionServiceServer is the server API for CameraConnectionService service.
 // All implementations must embed UnimplementedCameraConnectionServiceServer
 // for forward compatibility.
 type CameraConnectionServiceServer interface {
 	InitlizeCamera(context.Context, *InitlizeCameraRequest) (*InitlizeCameraResponse, error)
 	ConnectCamera(context.Context, *ConnectCameraRequest) (*ConnectCameraResponse, error)
+	DisconnectCamera(context.Context, *DisconnectCameraRequest) (*DisconnectCameraResponse, error)
 	mustEmbedUnimplementedCameraConnectionServiceServer()
 }
 
@@ -80,6 +93,9 @@ func (UnimplementedCameraConnectionServiceServer) InitlizeCamera(context.Context
 }
 func (UnimplementedCameraConnectionServiceServer) ConnectCamera(context.Context, *ConnectCameraRequest) (*ConnectCameraResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConnectCamera not implemented")
+}
+func (UnimplementedCameraConnectionServiceServer) DisconnectCamera(context.Context, *DisconnectCameraRequest) (*DisconnectCameraResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DisconnectCamera not implemented")
 }
 func (UnimplementedCameraConnectionServiceServer) mustEmbedUnimplementedCameraConnectionServiceServer() {
 }
@@ -139,6 +155,24 @@ func _CameraConnectionService_ConnectCamera_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CameraConnectionService_DisconnectCamera_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DisconnectCameraRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CameraConnectionServiceServer).DisconnectCamera(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CameraConnectionService_DisconnectCamera_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CameraConnectionServiceServer).DisconnectCamera(ctx, req.(*DisconnectCameraRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CameraConnectionService_ServiceDesc is the grpc.ServiceDesc for CameraConnectionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -153,6 +187,10 @@ var CameraConnectionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ConnectCamera",
 			Handler:    _CameraConnectionService_ConnectCamera_Handler,
+		},
+		{
+			MethodName: "DisconnectCamera",
+			Handler:    _CameraConnectionService_DisconnectCamera_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

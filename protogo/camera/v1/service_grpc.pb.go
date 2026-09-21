@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             (unknown)
-// source: camera/v1/camera.proto
+// source: camera/v1/service.proto
 
 package camerav1
 
@@ -193,5 +193,5 @@ var CameraService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "camera/v1/camera.proto",
+	Metadata: "camera/v1/service.proto",
 }
