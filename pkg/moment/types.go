@@ -170,7 +170,7 @@ func (s State) String() string { return domain.State(s).String() }
 
 func toDomainOptions(o ConnectOptions) domain.ConnectOptions {
 	return domain.ConnectOptions{
-		Type:    connectionv1.ConnectionMode(o.Type),
+		Type:    o.Type,
 		Model:   o.Model,
 		Host:    o.Host,
 		Port:    o.Port,
@@ -236,6 +236,7 @@ func toInfo(d domain.CameraInfo) CameraInfo {
 			FreeImages:  s.FreeImages,
 		})
 	}
+
 	if d.Config != nil {
 		info.Config = toConfigItem(d.Config)
 	}
@@ -246,6 +247,7 @@ func toConfigItem(d *domain.ConfigItem) *ConfigItem {
 	if d == nil {
 		return nil
 	}
+
 	item := &ConfigItem{
 		Name:     d.Name,
 		Label:    d.Label,
@@ -258,5 +260,6 @@ func toConfigItem(d *domain.ConfigItem) *ConfigItem {
 	for _, c := range d.Children {
 		item.Children = append(item.Children, toConfigItem(c))
 	}
+
 	return item
 }
