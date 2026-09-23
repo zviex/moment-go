@@ -2,7 +2,7 @@ package connection
 
 import (
 	"ci.zevix.uk/moment-go/pkg/registry"
-	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
+	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
 func Init() {

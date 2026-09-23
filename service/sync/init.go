@@ -2,7 +2,7 @@ package sync
 
 import (
 	"ci.zevix.uk/moment-go/pkg/registry"
-	syncv1 "ci.zevix.uk/moment-go/protogo/sync/v1"
+	syncv1 "ci.zevix.uk/moment/moment-protogo/sync/v1"
 )
 
 func Init() {

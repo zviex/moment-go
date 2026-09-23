@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"ci.zevix.uk/moment-go/internal/domain"
-	camerav1 "ci.zevix.uk/moment-go/protogo/camera/v1"
-	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
+	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
+	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
 // 公共错误哨兵：供调用方做错误分类。

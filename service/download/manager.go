@@ -11,8 +11,8 @@ import (
 	"ci.zevix.uk/moment-go/pkg/pubsub"
 	"ci.zevix.uk/moment-go/pkg/task"
 	"ci.zevix.uk/moment-go/pool/client"
-	downloadv1 "ci.zevix.uk/moment-go/protogo/download/v1"
 	"ci.zevix.uk/moment-go/storage"
+	downloadv1 "ci.zevix.uk/moment/moment-protogo/download/v1"
 )
 
 // taskInstance 是 download 模块实例化后的泛型任务类型。

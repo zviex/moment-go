@@ -3,7 +3,7 @@ package sync
 import (
 	"context"
 
-	syncv1 "ci.zevix.uk/moment-go/protogo/sync/v1"
+	syncv1 "ci.zevix.uk/moment/moment-protogo/sync/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

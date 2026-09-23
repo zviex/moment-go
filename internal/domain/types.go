@@ -4,7 +4,7 @@ package domain
 import (
 	"time"
 
-	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
+	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
 // // ConnectionType 描述与相机的连接方式。

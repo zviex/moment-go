@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"ci.zevix.uk/moment-go/pool/client"
-	camerav1 "ci.zevix.uk/moment-go/protogo/camera/v1"
+	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"

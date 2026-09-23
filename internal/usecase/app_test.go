@@ -9,7 +9,7 @@ import (
 
 	"ci.zevix.uk/moment-go/internal/domain"
 	"ci.zevix.uk/moment-go/internal/logging"
-	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
+	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
 // ---- 内存假后端，用于在无硬件环境验证用例编排 ----

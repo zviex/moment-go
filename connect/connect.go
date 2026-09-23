@@ -5,7 +5,7 @@ import (
 
 	"ci.zevix.uk/moment-go/pkg/moment"
 	"ci.zevix.uk/moment-go/pool/client"
-	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
+	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
 var factory = make(map[connectionv1.ConnectionMode]Connecter)

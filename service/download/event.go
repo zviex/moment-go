@@ -4,7 +4,7 @@ import (
 	"time"
 
 	gktask "ci.zevix.uk/moment-go/pkg/task"
-	downloadv1 "ci.zevix.uk/moment-go/protogo/download/v1"
+	downloadv1 "ci.zevix.uk/moment/moment-protogo/download/v1"
 )
 
 // taskStatus download 模块使用的整体任务状态枚举。

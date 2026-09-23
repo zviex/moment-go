@@ -3,7 +3,7 @@ package download
 import (
 	"context"
 
-	downloadv1 "ci.zevix.uk/moment-go/protogo/download/v1"
+	downloadv1 "ci.zevix.uk/moment/moment-protogo/download/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
