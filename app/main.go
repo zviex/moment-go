@@ -12,12 +12,31 @@
 package main
 
 import (
+	"context"
+	"log/slog"
+
 	"ci.zevix.uk/moment-go/server"
 	"ci.zevix.uk/moment-go/service"
+	"ci.zevix.uk/moment/moment-protogo/pkg/logger"
+	"ci.zevix.uk/moment/moment-protogo/pkg/logger/sink/std"
 )
 
 func main() {
+	ctx := context.Background()
+
 	service.Init()
+
+	lg, err := logger.Setup(ctx, logger.Config{
+		ServiceName:    "moment-camera",
+		ServiceVersion: "v0.1.0",
+		Level:          slog.LevelInfo,
+	}, logger.WithSink(std.New(std.WithPrettyPrint())))
+	if err != nil {
+		panic(err)
+	}
+
+	defer func() { _ = lg.Shutdown(ctx) }()
+
 	if err := server.DefaultSrv().Run(); err != nil {
 		panic(err)
 	}
