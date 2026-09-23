@@ -2,9 +2,11 @@ package connection
 
 import (
 	"context"
+	"errors"
 
 	"ci.zevix.uk/moment-go/config"
 	"ci.zevix.uk/moment-go/connect"
+	"ci.zevix.uk/moment-go/pool/client"
 	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
@@ -27,4 +29,15 @@ func (connService) ConnectCamera(ctx context.Context, req *connectionv1.ConnectC
 		Model: cam.Model(),
 		Port:  cam.PortPath(),
 	}, nil
+}
+
+func (connService) DisconnectCamera(ctx context.Context, req *connectionv1.DisconnectCameraRequest) (*connectionv1.DisconnectCameraResponse, error) {
+	cl := client.Default()
+	if cl == nil {
+		return nil, errors.New("cam has disconnect")
+	}
+
+	err := cl.Disconnect(ctx)
+
+	return &connectionv1.DisconnectCameraResponse{}, err
 }
