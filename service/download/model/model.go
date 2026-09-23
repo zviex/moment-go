@@ -1,6 +1,3 @@
-// Package model 只提供任务在持久化存储（如 SQLite）中的数据模型，
-// 不包含任何数据库操作。模型使用 sqlite 友好的标签；若要接入 GORM，
-// 只需在结构体上补充 gorm 标签即可。
 package model
 
 import "time"
@@ -31,8 +28,6 @@ type Task struct {
 	FinishedAt *time.Time `sqlite:"finished_at;type:datetime;null"`
 }
 
-// File 描述任务中单个文件的持久化形态。
-// 记录每个 url 在任务内的下载状态，重启后可据此恢复。
 type File struct {
 	ID           int64     `sqlite:"id;type:integer;primary key;auto increment"`
 	TaskID       string    `sqlite:"task_id;type:text;index"` // 外键指向 Task.ID
