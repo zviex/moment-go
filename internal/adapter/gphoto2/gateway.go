@@ -40,7 +40,7 @@ import (
 
 	"ci.zevix.uk/moment-go/internal/domain"
 	"ci.zevix.uk/moment-go/internal/logging"
-	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
+	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
 // 文件信息字段位掩码（gphoto2-filesys.h）。
