@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -43,15 +44,18 @@ func (c *Cache) Path() string {
 	return os.TempDir()
 }
 
-func Read(s Storage, name string) (io.Reader, error) {
-	return read(s, name)
+func Read(ctx context.Context, s Storage, name string) (io.Reader, error) {
+	return read(ctx, s, name)
 }
 
-func Write(s Storage, name string, writeFunc func(io.Writer) error) error {
-	return write(s, name, writeFunc)
+func Write(ctx context.Context, s Storage, name string, writeFunc func(io.Writer) error) error {
+	return write(ctx, s, name, writeFunc)
 }
 
-func read(s Storage, name string) (io.Reader, error) {
+func read(ctx context.Context, s Storage, name string) (io.Reader, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	file, err := os.Open(filepath.Join(s.Path(), name))
 	if err != nil {
 		return nil, err
@@ -59,7 +63,23 @@ func read(s Storage, name string) (io.Reader, error) {
 	return bufio.NewReader(file), nil
 }
 
-func write(s Storage, name string, writeFunc func(io.Writer) error) error {
+// ctxWriter 在每次写入前检查 ctx，使落盘过程可被取消。
+type ctxWriter struct {
+	ctx context.Context
+	w   io.Writer
+}
+
+func (cw ctxWriter) Write(p []byte) (int, error) {
+	if err := cw.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return cw.w.Write(p)
+}
+
+func write(ctx context.Context, s Storage, name string, writeFunc func(io.Writer) error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	dir := s.Path()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
@@ -72,7 +92,11 @@ func write(s Storage, name string, writeFunc func(io.Writer) error) error {
 
 	bufWriter := bufio.NewWriter(file)
 
-	if err := writeFunc(bufWriter); err != nil {
+	if err := writeFunc(ctxWriter{ctx: ctx, w: bufWriter}); err != nil {
+		return err
+	}
+
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 

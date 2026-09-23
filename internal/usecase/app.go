@@ -234,9 +234,16 @@ func (a *CameraApp) GetInfo(ctx context.Context) (domain.CameraInfo, error) {
 }
 
 // Close 释放应用层持有的资源（网关）。
+// 无 ctx 版本：内部以 5s 超时兜底，等价于 CloseContext(带超时的 ctx)。
 func (a *CameraApp) Close() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	return a.CloseContext(ctx)
+}
+
+// CloseContext 释放应用层持有的资源：断开连接（受 ctx 控制）并释放网关。
+// 网关释放本身为同步的本地释放，不受 ctx 影响。
+func (a *CameraApp) CloseContext(ctx context.Context) error {
 	_ = a.Disconnect(ctx)
 	if a.gateway != nil {
 		return a.gateway.Close()

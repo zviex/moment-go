@@ -60,8 +60,8 @@ func TestRecorderDownloadsCaptureEvents(t *testing.T) {
 	src := &captureStub{urls: []string{"/DCIM/IMG_1.JPG", "/DCIM/IMG_2.JPG"}}
 	dl := &recordDownloader{}
 
-	r := NewRecorder(src, dl)
-	if err := r.Enable(context.Background()); err != nil {
+	r := NewRecorder(context.Background(), src, dl)
+	if err := r.Enable(); err != nil {
 		t.Fatalf("enable: %v", err)
 	}
 	defer r.Disable()
@@ -82,7 +82,7 @@ func TestRecorderDownloadsCaptureEvents(t *testing.T) {
 func TestRecorderDisabledDoesNotConsumeSource(t *testing.T) {
 	src := &captureStub{urls: []string{"/DCIM/IMG_1.JPG"}}
 	dl := &recordDownloader{}
-	r := NewRecorder(src, dl)
+	r := NewRecorder(context.Background(), src, dl)
 
 	time.Sleep(50 * time.Millisecond)
 	if r.Enabled() {

@@ -20,7 +20,10 @@ func (download) CreateTask(ctx context.Context, req *downloadv1.CreateTaskReques
 	if req == nil || len(req.GetUrls()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "download: empty url list")
 	}
-	t, err := defaultManager.create(req.GetUrls())
+	if err := ctx.Err(); err != nil {
+		return nil, status.FromContextError(err).Err()
+	}
+	t, err := defaultManager.create(ctx, req.GetUrls())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "download: create task: %v", err)
 	}

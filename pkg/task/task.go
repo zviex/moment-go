@@ -13,6 +13,7 @@ package task
 import (
 	"container/list"
 	"context"
+	"errors"
 	stdlibsync "sync"
 
 	"ci.zevix.uk/moment-go/pkg/pubsub"
@@ -112,6 +113,9 @@ type Config[S, F comparable, E any] struct {
 	Jobs []string
 	// Concurrency 并发 worker 数；<=0 时缺省为 1。
 	Concurrency int
+	// RootCtx 是任务的父 ctx：取消时整个任务随之取消。为 nil 时退化为
+	// context.Background()，任务只能通过 Cancel 终止。
+	RootCtx context.Context
 }
 
 // Task 是一次批量下载任务：持有待下载队列、并发 worker 与暂停/恢复/取消/
@@ -193,11 +197,25 @@ func (t *Task[S, F, E]) Start() {
 		return
 	}
 	t.started = true
-	t.camCtx, t.cancelAll = context.WithCancel(context.Background())
+	root := t.cfg.RootCtx
+	if root == nil {
+		root = context.Background()
+	}
+	t.camCtx, t.cancelAll = context.WithCancel(root)
 	t.mu.Unlock()
 
 	for i := 0; i < t.concurrency; i++ {
 		go t.worker()
+	}
+	go t.watchRoot()
+}
+
+// watchRoot 在任务根 ctx 取消时取消整个任务，使阻塞在队列等待的 worker 及时退出。
+func (t *Task[S, F, E]) watchRoot() {
+	select {
+	case <-t.camCtx.Done():
+		t.Cancel()
+	case <-t.done:
 	}
 }
 
@@ -312,6 +330,9 @@ func (t *Task[S, F, E]) finish() {
 	t.status = status
 	close(t.done)
 	t.mu.Unlock()
+	if t.cancelAll != nil {
+		t.cancelAll()
+	}
 	t.cond.Broadcast()
 	t.emitTask(status)
 }
@@ -450,5 +471,5 @@ func isCancelled(err error) bool {
 	if err == nil {
 		return false
 	}
-	return err.Error() == "context canceled" || err.Error() == "context deadline exceeded"
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }

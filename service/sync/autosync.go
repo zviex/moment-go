@@ -24,6 +24,8 @@ type CaptureSource interface {
 
 // Recorder 并发安全由 run 的 atomic.Pointer CAS/Swap 保证，内部无锁。
 type Recorder struct {
+	// 构造期注入，之后只读。rootCtx 为应用级根 ctx：其取消会终止自动同步。
+	rootCtx    context.Context
 	downloader download.Downloader
 	source     CaptureSource
 
@@ -35,24 +37,30 @@ type recorderRun struct {
 	cancel context.CancelFunc
 }
 
-func NewRecorder(source CaptureSource, downloader download.Downloader) *Recorder {
-	return &Recorder{source: source, downloader: downloader}
+// NewRecorder 构造 Recorder：rootCtx 为应用级根 ctx，source/downloader 构造期注入。
+func NewRecorder(rootCtx context.Context, source CaptureSource, downloader download.Downloader) *Recorder {
+	if rootCtx == nil {
+		rootCtx = context.Background()
+	}
+	return &Recorder{rootCtx: rootCtx, source: source, downloader: downloader}
 }
 
-func NewDefaultRecorder(source CaptureSource) *Recorder {
-	return &Recorder{source: source, downloader: download.New()}
+// NewDefaultRecorder 构造使用共享 Downloader 的 Recorder。
+func NewDefaultRecorder(rootCtx context.Context, source CaptureSource) *Recorder {
+	return NewRecorder(rootCtx, source, download.New())
 }
 
-var defaultRecorder = NewDefaultRecorder(nil)
+// defaultRecorder 为全局共享实例；rootCtx/source 由 Init 阶段注入。
+var defaultRecorder = NewDefaultRecorder(nil, nil)
 
 // Enable 开启自动同步：开始监听拍摄事件并下载每个新拍文件。
 // 已在运行时重复调用无副作用。未注入 source 时返回错误。
-func (r *Recorder) Enable(ctx context.Context) error {
+func (r *Recorder) Enable() error {
 	if r.source == nil {
 		return errNoSource
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(r.rootCtx)
 
 	newRun := &recorderRun{cancel: cancel}
 	if !r.run.CompareAndSwap(nil, newRun) {

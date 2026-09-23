@@ -45,17 +45,46 @@ func (h *taskHandle) SubscribeEvents() *pubsub.Subscriber[*downloadv1.MonitorTas
 // manager 是任务注册表：CreateTask 创建并登记任务，MonitorTask/ControlTask
 // 通过 taskID 定位任务。
 type manager struct {
-	mu    sync.Mutex
-	tasks map[string]*taskHandle
+	mu      sync.Mutex
+	tasks   map[string]*taskHandle
+	rootCtx context.Context
 }
 
 var defaultManager = &manager{tasks: make(map[string]*taskHandle)}
 
-func (m *manager) create(urls []string) (*taskHandle, error) {
+// SetRootContext 绑定 manager 的应用级根 ctx：新建任务挂到该 ctx 下，
+// 应用退出时取消根 ctx 即可终止所有任务与回收协程。
+func (m *manager) SetRootContext(ctx context.Context) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	m.mu.Lock()
+	m.rootCtx = ctx
+	m.mu.Unlock()
+}
+
+// root 返回 manager 的根 ctx；未设置时退化为 ctx（通常是调用方传入的请求 ctx），
+// 最终兜底为 Background。
+func (m *manager) root(fallback context.Context) context.Context {
+	m.mu.Lock()
+	root := m.rootCtx
+	m.mu.Unlock()
+	if root != nil {
+		return root
+	}
+	if fallback != nil {
+		return fallback
+	}
+	return context.Background()
+}
+
+func (m *manager) create(ctx context.Context, urls []string) (*taskHandle, error) {
 	id, err := newTaskID()
 	if err != nil {
 		return nil, err
 	}
+
+	root := m.root(ctx)
 
 	downloader := New(WithStorage(&storage.Disk{}))
 
@@ -66,6 +95,7 @@ func (m *manager) create(urls []string) (*taskHandle, error) {
 			Build:       buildMonitorEvent(id),
 			Jobs:        urls,
 			Concurrency: 1,
+			RootCtx:     root,
 		},
 	)
 
@@ -75,10 +105,19 @@ func (m *manager) create(urls []string) (*taskHandle, error) {
 	m.tasks[id] = h
 	m.mu.Unlock()
 
-	// 任务结束后留一段宽限期供 MonitorTask 读取收尾事件，再回收内存。
+	// 任务结束后留一段宽限期供 MonitorTask 读取收尾事件，再回收内存；
+	// 宽限期内根 ctx 取消则立即回收。
 	go func() {
-		<-t.Done()
-		time.Sleep(30 * time.Second)
+		select {
+		case <-t.Done():
+		case <-root.Done():
+			m.remove(id)
+			return
+		}
+		select {
+		case <-time.After(30 * time.Second):
+		case <-root.Done():
+		}
 		m.remove(id)
 	}()
 

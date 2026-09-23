@@ -94,7 +94,7 @@ func (d *cameraDownloader) Download(ctx context.Context, url string, onProgress 
 
 	// 写入 Disk 存储；writer 计数用于进度计算。
 	var counter countWriter
-	writeErr := storage.Write(d.storage, ref.localName(), func(w io.Writer) error {
+	writeErr := storage.Write(ctx, d.storage, ref.localName(), func(w io.Writer) error {
 		counter.Writer = w
 		return d.doDownload(ctx, ref, &counter, url, watcher, total)
 	})

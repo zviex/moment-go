@@ -14,6 +14,9 @@ package main
 import (
 	"context"
 	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"ci.zevix.uk/moment-go/server"
 	"ci.zevix.uk/moment-go/service"
@@ -22,9 +25,12 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	// 根 ctx 由 SIGINT/SIGTERM 触发取消，贯穿服务初始化与服务运行，
+	// 使自动同步、下载任务等长生命周期协程随进程退出而终止。
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	service.Init()
+	service.Init(ctx)
 
 	lg, err := logger.Setup(ctx, logger.Config{
 		ServiceName:    "moment-camera",
@@ -35,9 +41,9 @@ func main() {
 		panic(err)
 	}
 
-	defer func() { _ = lg.Shutdown(ctx) }()
+	defer func() { _ = lg.Shutdown(context.Background()) }()
 
-	if err := server.DefaultSrv().Run(); err != nil {
+	if err := server.DefaultSrv().Run(ctx); err != nil {
 		panic(err)
 	}
 }

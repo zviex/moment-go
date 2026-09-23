@@ -13,7 +13,10 @@ type sync struct {
 }
 
 func (sync) EnableAutoSync(ctx context.Context, req *syncv1.EnableAutoSyncRequest) (*syncv1.EnableAutoSyncResponse, error) {
-	if err := defaultRecorder.Enable(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
+		return nil, status.FromContextError(err).Err()
+	}
+	if err := defaultRecorder.Enable(); err != nil {
 		return nil, status.Errorf(codes.Internal, "autosync: enable: %v", err)
 	}
 
