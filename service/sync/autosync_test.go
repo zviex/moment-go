@@ -19,6 +19,7 @@ func (c *captureStub) Events(ctx context.Context) (<-chan CaptureEvent, error) {
 	ch := make(chan CaptureEvent)
 	go func() {
 		defer close(ch)
+
 		for _, u := range c.urls {
 			select {
 			case ch <- CaptureEvent{URL: u, At: time.Now()}:
@@ -29,6 +30,7 @@ func (c *captureStub) Events(ctx context.Context) (<-chan CaptureEvent, error) {
 		// 事件发完后保持通道打开，等待 ctx 取消，贴近真实事件流。
 		<-ctx.Done()
 	}()
+
 	return ch, nil
 }
 
@@ -42,6 +44,7 @@ func (r *recordDownloader) Download(_ context.Context, url string, _ func(gktask
 	r.mu.Lock()
 	r.urls = append(r.urls, url)
 	r.mu.Unlock()
+
 	return nil
 }
 
@@ -57,8 +60,8 @@ func TestRecorderDownloadsCaptureEvents(t *testing.T) {
 	src := &captureStub{urls: []string{"/DCIM/IMG_1.JPG", "/DCIM/IMG_2.JPG"}}
 	dl := &recordDownloader{}
 
-	r := &Recorder{downloader: dl, source: src}
-	if err := r.Enable(); err != nil {
+	r := NewRecorder(src, dl)
+	if err := r.Enable(context.Background()); err != nil {
 		t.Fatalf("enable: %v", err)
 	}
 	defer r.Disable()
@@ -79,7 +82,7 @@ func TestRecorderDownloadsCaptureEvents(t *testing.T) {
 func TestRecorderDisabledDoesNotConsumeSource(t *testing.T) {
 	src := &captureStub{urls: []string{"/DCIM/IMG_1.JPG"}}
 	dl := &recordDownloader{}
-	r := &Recorder{downloader: dl, source: src}
+	r := NewRecorder(src, dl)
 
 	time.Sleep(50 * time.Millisecond)
 	if r.Enabled() {
