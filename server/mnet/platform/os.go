@@ -23,7 +23,7 @@ func (Android) Addr() string {
 type MacOS struct{}
 
 func (MacOS) OS() string {
-	return "macos"
+	return "darwin"
 }
 
 func (MacOS) Addr() string {

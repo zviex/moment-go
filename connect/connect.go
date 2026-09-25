@@ -18,7 +18,7 @@ type Connecter interface {
 func Open(ctx context.Context, req *connectionv1.ConnectCameraRequest) (*moment.Camera, error) {
 	// 当前端退出，但是后端保持活性，还存在连接实例则直接返回
 	cl := client.Default()
-	if cl != nil {
+	if cl.IsConnected() {
 		return cl.Camera()
 	}
 

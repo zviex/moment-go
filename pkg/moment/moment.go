@@ -38,7 +38,13 @@ func New(opts ...Option) (*Client, error) {
 func (c *Client) State() State { return State(c.app.State()) }
 
 // IsConnected 是否已连接。
-func (c *Client) IsConnected() bool { return c.app.IsConnected() }
+func (c *Client) IsConnected() bool {
+	if c != nil {
+		return c.app.IsConnected()
+	}
+
+	return false
+}
 
 // LastError 返回最近一次失败原因。
 func (c *Client) LastError() error { return c.app.LastError() }

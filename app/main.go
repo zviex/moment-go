@@ -19,6 +19,7 @@ import (
 	"syscall"
 
 	"ci.zevix.uk/moment-go/server"
+	"ci.zevix.uk/moment-go/server/mnet"
 	"ci.zevix.uk/moment-go/service"
 	"ci.zevix.uk/moment/moment-protogo/pkg/logger"
 	"ci.zevix.uk/moment/moment-protogo/pkg/logger/sink/std"
@@ -31,6 +32,7 @@ func main() {
 	defer stop()
 
 	service.Init(ctx)
+	mnet.Init()
 
 	lg, err := logger.Setup(ctx, logger.Config{
 		ServiceName:    "moment-camera",
