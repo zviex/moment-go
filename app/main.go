@@ -31,19 +31,19 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	service.Init(ctx)
-	mnet.Init()
-
 	lg, err := logger.Setup(ctx, logger.Config{
 		ServiceName:    "moment-camera",
 		ServiceVersion: "v0.1.0",
-		Level:          slog.LevelInfo,
+		Level:          slog.LevelDebug,
 	}, logger.WithSink(std.New(std.WithPrettyPrint())))
 	if err != nil {
 		panic(err)
 	}
 
 	defer func() { _ = lg.Shutdown(context.Background()) }()
+
+	service.Init(ctx)
+	mnet.Init()
 
 	if err := server.DefaultSrv().Run(ctx); err != nil {
 		panic(err)

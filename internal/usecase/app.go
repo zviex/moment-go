@@ -7,10 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
 	"ci.zevix.uk/moment-go/internal/domain"
-	"ci.zevix.uk/moment-go/internal/logging"
 )
 
 // maxWalkDepth 防止相机返回异常深度的目录树时无限递归。
@@ -21,17 +21,12 @@ type CameraApp struct {
 	gateway   domain.Gateway
 	session   domain.CameraSession
 	lifecycle *Lifecycle
-	logger    logging.Logger
 }
 
-func NewCameraApp(gateway domain.Gateway, logger logging.Logger) *CameraApp {
-	if logger == nil {
-		logger = logging.Nop{}
-	}
+func NewCameraApp(gateway domain.Gateway) *CameraApp {
 	return &CameraApp{
 		gateway:   gateway,
 		lifecycle: NewLifecycle(),
-		logger:    logger,
 	}
 }
 
@@ -66,11 +61,11 @@ func (a *CameraApp) Connect(ctx context.Context, opts domain.ConnectOptions) (do
 		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
 		defer cancel()
 	}
-	a.logger.Infof("connecting camera: type=%v model=%q host=%q port=%d", opts.Type, opts.Model, opts.Host, opts.Port)
+	slog.Info("connecting camera", "type", opts.Type, "model", opts.Model, "host", opts.Host, "port", opts.Port)
 	sess, err := a.gateway.Connect(ctx, opts)
 	if err != nil {
 		a.lifecycle.fail(err)
-		a.logger.Errorf("connect failed: %v", err)
+		slog.Error("connect failed", "err", err)
 		return nil, err
 	}
 	a.session = sess
@@ -79,7 +74,7 @@ func (a *CameraApp) Connect(ctx context.Context, opts domain.ConnectOptions) (do
 		a.session = nil
 		return nil, err
 	}
-	a.logger.Infof("connected: model=%q driver=%q port=%q", sess.Model(), sess.Driver(), sess.PortPath())
+	slog.Info("connected", "model", sess.Model(), "driver", sess.Driver(), "port", sess.PortPath())
 	return sess, nil
 }
 
@@ -101,9 +96,9 @@ func (a *CameraApp) Disconnect(ctx context.Context) error {
 	}
 	_ = a.lifecycle.transition(domain.StateDisconnecting, domain.StateDisconnected)
 	if closeErr != nil {
-		a.logger.Warnf("disconnect: %v", closeErr)
+		slog.Warn("disconnect", "err", closeErr)
 	}
-	a.logger.Infof("disconnected")
+	slog.Info("disconnected")
 	return closeErr
 }
 
@@ -164,7 +159,7 @@ func (a *CameraApp) walk(ctx context.Context, sess domain.CameraSession, path st
 	sub, err := sess.ListFolders(ctx, path)
 	if err != nil {
 		// 某些相机对根目录下的特殊存储节点不支持列目录，跳过并记录。
-		a.logger.Warnf("list folders %q: %v", path, err)
+		slog.Warn("list folders failed", "folder", path, "err", err)
 	} else {
 		for _, f := range sub {
 			*folders = append(*folders, f)

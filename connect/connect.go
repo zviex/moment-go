@@ -22,7 +22,7 @@ func Open(ctx context.Context, req *connectionv1.ConnectCameraRequest) (*moment.
 		return cl.Camera()
 	}
 
-	cl, err := moment.New(moment.WithVerboseLog(true))
+	cl, err := moment.New()
 	if err != nil {
 		return nil, err
 	}

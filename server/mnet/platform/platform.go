@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"log/slog"
 	"runtime"
 )
 
@@ -29,8 +30,10 @@ type SocketAddr interface {
 
 func PlatformAddr() string {
 	if str, ok := fd.m[runtime.GOOS]; ok {
+		slog.Debug("platform socket address resolved", "os", runtime.GOOS, "addr", str)
 		return str
 	}
 
+	slog.Debug("unsupported platform", "os", runtime.GOOS)
 	panic("unsupport platform")
 }

@@ -32,6 +32,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -39,7 +40,6 @@ import (
 	"unsafe"
 
 	"ci.zevix.uk/moment-go/internal/domain"
-	"ci.zevix.uk/moment-go/internal/logging"
 	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
@@ -69,20 +69,16 @@ const ptpipCameraModel = "PTP/IP Camera"
 // Gateway 实现 domain.Gateway：通过 libgphoto2 C API 探测与连接相机。
 // 与平台无关：Linux / macOS 使用系统安装的 libgphoto2，Android 使用随包 .so。
 type Gateway struct {
-	logger logging.Logger
-	ctx    *C.GPContext
+	ctx *C.GPContext
 }
 
 // NewGateway 创建网关并初始化 GPContext。
-func NewGateway(logger logging.Logger) (*Gateway, error) {
-	if logger == nil {
-		logger = logging.Nop{}
-	}
+func NewGateway() (*Gateway, error) {
 	ctx, err := newGPContext()
 	if err != nil {
 		return nil, err
 	}
-	return &Gateway{logger: logger, ctx: ctx}, nil
+	return &Gateway{ctx: ctx}, nil
 }
 
 // Close 释放 GPContext。
@@ -155,6 +151,11 @@ func (g *Gateway) Connect(ctx context.Context, opts domain.ConnectOptions) (doma
 	if err != nil {
 		return nil, err
 	}
+	slog.Debug("resolved camera target",
+		"mode", opts.Type,
+		"port_path", portPath,
+		"model", model,
+	)
 
 	// 1. 加载端口信息列表并定位端口。
 	// 端口信息由列表持有，需保证列表在 gp_camera_init 之前一直存活。
@@ -196,6 +197,8 @@ func (g *Gateway) Connect(ctx context.Context, opts domain.ConnectOptions) (doma
 		driver = C.GoString(&ab.library[0])
 	}
 
+	slog.Debug("camera driver resolved", "driver", driver, "model", model, "port_path", portPath)
+
 	return &cameraSession{
 		gateway:  g,
 		cam:      cam,
@@ -225,6 +228,7 @@ func (g *Gateway) resolveTarget(ctx context.Context, opts domain.ConnectOptions)
 		if model == "" {
 			model = ptpipCameraModel
 		}
+		slog.Debug("ptp/ip target resolved", "host", addr, "port", port, "port_path", portPath)
 		return portPath, model, nil
 
 	case connectionv1.ConnectionMode_CONNECTION_MODE_USB:
@@ -567,14 +571,14 @@ func (s *cameraSession) GetInfo(ctx context.Context) (domain.CameraInfo, error) 
 	if storage, err := s.storageInfoLocked(); err == nil {
 		info.Storage = storage
 	} else if !errors.Is(err, domain.ErrUnsupported) {
-		s.gateway.logger.Debugf("storage info: %v", err)
+		slog.Debug("storage info", "err", err)
 	}
 
 	// 配置树。
 	if cfg, err := s.configLocked(); err == nil {
 		info.Config = cfg
 	} else if !errors.Is(err, domain.ErrUnsupported) {
-		s.gateway.logger.Debugf("config tree: %v", err)
+		slog.Debug("config tree", "err", err)
 	}
 
 	return info, nil

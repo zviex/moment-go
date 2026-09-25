@@ -3,6 +3,7 @@ package mnet
 import (
 	"errors"
 	"io/fs"
+	"log/slog"
 	"os"
 
 	"ci.zevix.uk/moment-go/server/mnet/platform"
@@ -52,6 +53,7 @@ func NewUnix() *Unix {
 
 // NewUnixAt 使用显式地址创建监听配置，便于测试或自定义部署。
 func NewUnixAt(addr string) *Unix {
+	slog.Debug("unix socket configured", "network", "unix", "addr", addr)
 	return &Unix{addr: addr}
 }
 
@@ -64,7 +66,9 @@ func (u Unix) Addr() string {
 }
 
 func (u Unix) Cleanup() error {
+	slog.Debug("unix socket cleanup", "addr", u.addr)
 	if err := os.Remove(u.addr); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		slog.Debug("unix socket cleanup failed", "addr", u.addr, "err", err)
 		return err
 	}
 

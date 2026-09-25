@@ -4,9 +4,9 @@ package gphoto2
 
 import (
 	"context"
+	"log/slog"
 
 	"ci.zevix.uk/moment-go/internal/domain"
-	"ci.zevix.uk/moment-go/internal/logging"
 )
 
 // Gateway 是未启用 cgo（CGO_ENABLED=0）时的默认桩后端。
@@ -18,17 +18,12 @@ import (
 //
 // 这样在缺少 C 工具链或 libgphoto2 的环境里，模块依旧可以编译、单测，
 // 并演示完整的 API 与生命周期流程。
-type Gateway struct {
-	logger logging.Logger
-}
+type Gateway struct{}
 
 // NewGateway 创建桩网关。
-func NewGateway(logger logging.Logger) (*Gateway, error) {
-	if logger == nil {
-		logger = logging.Nop{}
-	}
-	logger.Warnf("libgphoto2 backend unavailable: built without cgo (CGO_ENABLED=0)")
-	return &Gateway{logger: logger}, nil
+func NewGateway() (*Gateway, error) {
+	slog.Warn("libgphoto2 backend unavailable: built without cgo (CGO_ENABLED=0)")
+	return &Gateway{}, nil
 }
 
 // Close 无需释放资源。
@@ -39,12 +34,12 @@ func (g *Gateway) Detect(ctx context.Context) ([]domain.DetectedCamera, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	g.logger.Warnf("libgphoto2 backend unavailable: no camera can be detected")
+	slog.Warn("libgphoto2 backend unavailable: no camera can be detected")
 	return nil, nil
 }
 
 // Connect 在无 cgo 构建下不可用。
 func (g *Gateway) Connect(_ context.Context, _ domain.ConnectOptions) (domain.CameraSession, error) {
-	g.logger.Warnf("libgphoto2 backend unavailable: rebuild with CGO_ENABLED=1")
+	slog.Warn("libgphoto2 backend unavailable: rebuild with CGO_ENABLED=1")
 	return nil, domain.ErrBackendUnavailable
 }

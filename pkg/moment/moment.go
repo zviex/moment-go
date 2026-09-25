@@ -14,7 +14,7 @@ type Client struct {
 	app *usecase.CameraApp
 }
 
-// New 创建 Client。可通过 Option 配置日志与 libgphoto2 运行库目录。
+// New 创建 Client。可通过 Option 配置 libgphoto2 运行库目录。
 func New(opts ...Option) (*Client, error) {
 	o := options{}
 	for _, opt := range opts {
@@ -27,11 +27,11 @@ func New(opts ...Option) (*Client, error) {
 	if err := gphoto2.Bootstrap(o.libraryRoot, o.camlibDir, o.iolibDir); err != nil {
 		return nil, err
 	}
-	gw, err := gphoto2.NewGateway(o.logger)
+	gw, err := gphoto2.NewGateway()
 	if err != nil {
 		return nil, err
 	}
-	return &Client{app: usecase.NewCameraApp(gw, o.logger)}, nil
+	return &Client{app: usecase.NewCameraApp(gw)}, nil
 }
 
 // State 返回当前生命周期状态。

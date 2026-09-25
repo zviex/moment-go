@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"ci.zevix.uk/moment-go/internal/domain"
-	"ci.zevix.uk/moment-go/internal/logging"
 	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
@@ -125,7 +124,7 @@ func (s *fakeSession) Close(context.Context) error { return nil }
 // ---- 用例测试 ----
 
 func newTestApp() *CameraApp {
-	return NewCameraApp(fakeGateway{}, logging.Nop{})
+	return NewCameraApp(fakeGateway{})
 }
 
 func TestConnectLifecycle(t *testing.T) {

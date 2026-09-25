@@ -37,7 +37,7 @@ moment-go/
 ├── pkg/moment/                    # delivery：对外公共 API
 │   ├── moment.go                  # Client / Camera
 │   ├── types.go                   # 公共类型与错误哨兵
-│   └── options.go                 # 日志 / 库目录选项
+│   └── options.go                 # libgphoto2 库目录选项
 └── internal/
     ├── domain/                    # 领域层：实体 + 端口 + 错误
     │   ├── types.go               # Camera / File / ConfigItem / State ...
@@ -46,7 +46,6 @@ moment-go/
     ├── usecase/                   # 用例层：生命周期 + 用例编排
     │   ├── lifecycle.go           # 状态机
     │   └── app.go                 # Connect / ListTree / Download / GetInfo ...
-    ├── logging/                   # 跨层日志抽象
     └── adapter/gphoto2/           # 适配层：cgo 绑定（全平台）+ 桩（CGO_ENABLED=0）
         ├── bindings.go            # #cgo 指令（头文件 / 链接）
         ├── context.go             # GPContext 生命周期
@@ -89,7 +88,7 @@ func main() {
 
 	// 创建客户端。桌面端默认使用系统安装的 libgphoto2；
 	// Android 上先解压 .so，再传入布局根目录：
-	// client, err := moment.New(moment.WithLibraryRoot(filesDir), moment.WithVerboseLog(true))
+	// client, err := moment.New(moment.WithLibraryRoot(filesDir))
 	client, err := moment.New()
 	if err != nil {
 		panic(err)

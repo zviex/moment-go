@@ -1,31 +1,12 @@
 package moment
 
-import "ci.zevix.uk/moment-go/internal/logging"
-
 // Option 配置 Client 的可选项。
 type Option func(*options)
 
 type options struct {
-	logger      logging.Logger
 	libraryRoot string // CAMLIBS/IOLIBS 布局根目录
 	camlibDir   string // 显式指定 camlib 目录（优先于 libraryRoot）
 	iolibDir    string // 显式指定 iolib 目录（优先于 libraryRoot）
-}
-
-// WithLogger 设置日志实现；缺省为静默（logging.Nop）。
-func WithLogger(l logging.Logger) Option {
-	return func(o *options) {
-		if l != nil {
-			o.logger = l
-		}
-	}
-}
-
-// WithVerboseLog 使用标准库 log 并开启 Debug 输出。
-func WithVerboseLog(verbose bool) Option {
-	return func(o *options) {
-		o.logger = logging.NewStd(verbose)
-	}
 }
 
 // WithLibraryRoot 设置 libgphoto2 运行库布局根目录。
