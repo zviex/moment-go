@@ -22,7 +22,7 @@ import (
 	"ci.zevix.uk/moment-go/server/mnet"
 	"ci.zevix.uk/moment-go/service"
 	"ci.zevix.uk/moment/moment-protogo/pkg/logger"
-	"ci.zevix.uk/moment/moment-protogo/pkg/logger/sink/std"
+	"ci.zevix.uk/moment/moment-protogo/pkg/logger/sink/victorialogs"
 )
 
 func main() {
@@ -31,11 +31,16 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	vl, err := victorialogs.New("http://logs.home.arpa:9740")
+	if err != nil {
+		panic(err)
+	}
+
 	lg, err := logger.Setup(ctx, logger.Config{
 		ServiceName:    "moment-camera",
 		ServiceVersion: "v0.1.0",
 		Level:          slog.LevelDebug,
-	}, logger.WithSink(std.New(std.WithPrettyPrint())))
+	}, logger.WithSink(vl))
 	if err != nil {
 		panic(err)
 	}
