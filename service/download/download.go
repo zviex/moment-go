@@ -2,6 +2,7 @@ package download
 
 import (
 	"context"
+	"errors"
 
 	downloadv1 "ci.zevix.uk/moment/moment-protogo/download/v1"
 	"google.golang.org/grpc"
@@ -44,7 +45,20 @@ func (download) MonitorTask(req *downloadv1.MonitorTaskRequest, stream grpc.Serv
 
 	t, ok := defaultManager.get(req.GetTaskId())
 	if !ok {
-		return status.Error(codes.NotFound, "download: task not found")
+		// 内存中已回收的任务，从历史库回放其最终状态。
+		rec, err := defaultManager.history(stream.Context(), req.GetTaskId())
+		if err != nil {
+			if errors.Is(err, ErrTaskNotFound) {
+				return status.Error(codes.NotFound, "download: task not found")
+			}
+			return status.Errorf(codes.Internal, "download: load history: %v", err)
+		}
+		for _, ev := range historyEvents(rec) {
+			if err := stream.Send(ev); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	sub := t.SubscribeEvents()

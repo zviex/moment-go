@@ -47,7 +47,9 @@ func main() {
 
 	defer func() { _ = lg.Shutdown(context.Background()) }()
 
-	service.Init(ctx)
+	if err := service.Init(ctx); err != nil {
+		panic(err)
+	}
 	mnet.Init()
 
 	if err := server.DefaultSrv().Run(ctx); err != nil {

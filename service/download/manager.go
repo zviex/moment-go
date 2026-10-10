@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -44,9 +45,57 @@ type manager struct {
 	mu      sync.Mutex
 	tasks   map[string]*taskHandle
 	rootCtx context.Context
+	// store 为任务历史的持久化后端；为 nil 时不做持久化。
+	store *Store
 }
 
 var defaultManager = &manager{tasks: make(map[string]*taskHandle)}
+
+// SetStore 绑定历史持久化存储。
+func (m *manager) SetStore(s *Store) {
+	m.mu.Lock()
+	m.store = s
+	m.mu.Unlock()
+}
+
+func (m *manager) getStore() *Store {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.store
+}
+
+// persistTimeout 限制单次落库耗时，避免数据库异常拖慢下载事件广播。
+const persistTimeout = 5 * time.Second
+
+// persist 把任务内部事件写入历史库。失败只记日志，不影响下载本身。
+func (m *manager) persist(taskID string, ev task.Event[taskStatus, fileStatus]) {
+	s := m.getStore()
+	if s == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), persistTimeout)
+	defer cancel()
+	var err error
+	switch {
+	case ev.IsFile():
+		pct := ev.Progress.Percent()
+		if pct < 0 {
+			pct = 0
+		}
+		err = s.RecordFile(ctx, taskID, ev.URL, ev.FileStatus, pct,
+			ev.Progress.Downloaded, ev.Progress.Total, ev.Error)
+	case ev.IsTask():
+		err = s.RecordTask(ctx, taskID, ev.TaskStatus, ev.Counts.Completed, ev.Counts.Failed)
+	}
+	if err != nil {
+		slog.Warn("download history: persist event failed", "task", taskID, "err", err)
+	}
+}
+
+// history 从历史库读取一个已结束（或已中断）的任务。
+func (m *manager) history(ctx context.Context, id string) (*TaskRecord, error) {
+	return m.getStore().GetTask(ctx, id)
+}
 
 // SetRootContext 绑定 manager 的应用级根 ctx：新建任务挂到该 ctx 下，
 // 应用退出时取消根 ctx 即可终止所有任务与回收协程。
@@ -82,13 +131,26 @@ func (m *manager) create(ctx context.Context, urls []string) (*taskHandle, error
 
 	root := m.root(ctx)
 
+	// 先登记历史记录，保证之后的事件都能找到对应行。登记失败不阻断下载。
+	if s := m.getStore(); s != nil {
+		cctx, cancel := context.WithTimeout(context.Background(), persistTimeout)
+		if err := s.CreateTask(cctx, id, urls); err != nil {
+			slog.Warn("download history: create task failed", "task", id, "err", err)
+		}
+		cancel()
+	}
+
 	downloader := New(WithStorage(storage.Default()))
+	toEvent := buildMonitorEvent(id)
 
 	t := task.New(
 		task.Config[taskStatus, fileStatus, *downloadv1.MonitorTaskResponse]{
-			States:      taskState,
-			Work:        makeWork(downloader),
-			Build:       buildMonitorEvent(id),
+			States: taskState,
+			Work:   makeWork(downloader),
+			Build: func(ev task.Event[taskStatus, fileStatus]) *downloadv1.MonitorTaskResponse {
+				m.persist(id, ev)
+				return toEvent(ev)
+			},
 			Jobs:        urls,
 			Concurrency: 1,
 			RootCtx:     root,

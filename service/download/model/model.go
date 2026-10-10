@@ -1,44 +1,41 @@
+// Package model 定义下载任务持久化到 SQLite 的 bun 表模型。
 package model
 
-import "time"
+import (
+	"time"
 
-// Task 描述一次批量下载任务在数据库中的持久化形态。
+	"github.com/uptrace/bun"
+)
+
+// Task 对应 download_tasks 表：一次批量下载任务。
 type Task struct {
-	// ID 任务唯一标识。
-	ID string `sqlite:"task_id;type:text;primary key"`
-	// Name 可选任务名。
-	Name string `sqlite:"name;type:text"`
-	// TotalFiles 本次任务的文件总数。
-	TotalFiles int `sqlite:"total_files;type:integer"`
-	// Completed 已完成数。
-	Completed int `sqlite:"completed;type:integer"`
-	// Failed 失败数。
-	Failed int `sqlite:"failed;type:integer"`
-	// Canceled 被移除/取消数。
-	Canceled int `sqlite:"canceled;type:integer"`
-	// Status TaskStatus 枚举值。
-	Status int `sqlite:"status;type:integer"`
-	// Concurrency worker 并发数。
-	Concurrency int `sqlite:"concurrency;type:integer"`
-	// CreatedAt 创建时间。
-	CreatedAt time.Time `sqlite:"created_at;type:datetime"`
-	// UpdatedAt 更新时间。
-	UpdatedAt time.Time `sqlite:"updated_at;type:datetime"`
-	// FinishedAt 任务结束时间（未结束为 nil）。
-	FinishedAt *time.Time `sqlite:"finished_at;type:datetime;null"`
+	bun.BaseModel `bun:"table:download_tasks,alias:t"`
+
+	ID         string     `bun:"id,pk"`
+	Status     int32      `bun:"status,notnull"`      // downloadv1.TaskStatus
+	TotalFiles int        `bun:"total_files,notnull"` // 文件总数
+	Completed  int        `bun:"completed,notnull"`
+	Failed     int        `bun:"failed,notnull"`
+	Note       string     `bun:"note"` // 异常说明，如进程退出导致的中断
+	CreatedAt  time.Time  `bun:"created_at,notnull"`
+	UpdatedAt  time.Time  `bun:"updated_at,notnull"`
+	FinishedAt *time.Time `bun:"finished_at"`
 }
 
+// File 对应 download_files 表：任务内的单个文件。
+// (task_id, url) 唯一，id 自增用于保持入队顺序。
 type File struct {
-	ID           int64     `sqlite:"id;type:integer;primary key;auto increment"`
-	TaskID       string    `sqlite:"task_id;type:text;index"` // 外键指向 Task.ID
-	URL          string    `sqlite:"url;type:text"`           // 远端/相机文件引用
-	Folder       string    `sqlite:"folder;type:text"`        // 解析后的相机目录
-	Name         string    `sqlite:"name;type:text"`          // 解析后的文件名
-	Status       int       `sqlite:"status;type:integer"`     // FileStatus 枚举值
-	ProgressPct  int32     `sqlite:"progress_pct;type:integer"`
-	Downloaded   int64     `sqlite:"downloaded_bytes;type:integer"`
-	TotalBytes   int64     `sqlite:"total_bytes;type:integer;null"` // -1 表示未知
-	ErrorMessage string    `sqlite:"error_message;type:text;null"`
-	CreatedAt    time.Time `sqlite:"created_at;type:datetime"`
-	UpdatedAt    time.Time `sqlite:"updated_at;type:datetime"`
+	bun.BaseModel `bun:"table:download_files,alias:f"`
+
+	ID           int64     `bun:"id,pk,autoincrement"`
+	TaskID       string    `bun:"task_id,notnull,unique:task_url"`
+	URL          string    `bun:"url,notnull,unique:task_url"`
+	Folder       string    `bun:"folder,notnull"`
+	Name         string    `bun:"name,notnull"`
+	Status       int32     `bun:"status,notnull"` // downloadv1.FileStatus
+	ProgressPct  int32     `bun:"progress_pct,notnull"`
+	Downloaded   int64     `bun:"downloaded_bytes,notnull"`
+	TotalBytes   int64     `bun:"total_bytes,notnull"` // -1 表示未知
+	ErrorMessage string    `bun:"error_message"`
+	UpdatedAt    time.Time `bun:"updated_at,notnull"`
 }
