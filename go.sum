@@ -1,5 +1,3 @@
-ci.zevix.uk/moment/moment-protogo v0.0.0-20260925100909-e251dbb58e8d h1:x2SixlAWx0QcAxhP6mBbE9cIAmWpGjS7+NKqVCUlc+4=
-ci.zevix.uk/moment/moment-protogo v0.0.0-20260925100909-e251dbb58e8d/go.mod h1:E3qcnpoQdBwYvZpDHnfwj/D+xpvjLTS7LO0m9RYVtk4=
 ci.zevix.uk/moment/moment-protogo v0.0.0-20260927140440-75130cada129 h1:PkJu4dxJqDPjv2fBmT0kW/CLECdzjycdbtmmE69Vs0Q=
 ci.zevix.uk/moment/moment-protogo v0.0.0-20260927140440-75130cada129/go.mod h1:E3qcnpoQdBwYvZpDHnfwj/D+xpvjLTS7LO0m9RYVtk4=
 github.com/cenkalti/backoff/v5 v5.0.3 h1:ZN+IMa753KfX5hd8vVaMixjnqRZ3y8CuJKRKj1xcsSM=

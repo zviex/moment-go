@@ -20,13 +20,13 @@ type Downloader interface {
 	Download(ctx context.Context, url string, onProgress func(task.Progress)) error
 }
 
-// ErrNoCamera 表示当前没有可用的相机会话。
 var ErrNoCamera = errors.New("download: camera session unavailable")
 
 // New 构造一个使用默认相机（client.Default().Camera()）与 Disk 存储的下载器。
 // 默认写入 Disk；该构造是可选的便捷入口，方法把具体存储通过选项传入。
 func New(opts ...Option) Downloader {
-	c := &cameraDownloader{storage: &storage.Disk{}}
+	c := &cameraDownloader{storage: storage.Default()}
+
 	for _, o := range opts {
 		if o != nil {
 			o(c)
@@ -71,16 +71,17 @@ func (d *cameraDownloader) Download(ctx context.Context, url string, onProgress 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+
 	if onProgress == nil {
 		onProgress = func(task.Progress) {}
 	}
+
 	if d.storage == nil {
-		d.storage = &storage.Disk{}
+		d.storage = storage.Default()
 	}
+
 	if d.cam == nil {
-		d.cam = func() (*moment.Camera, error) {
-			return momentClientCamera()
-		}
+		d.cam = momentClientCamera
 	}
 
 	ref := parseFileRef(url)
@@ -90,10 +91,12 @@ func (d *cameraDownloader) Download(ctx context.Context, url string, onProgress 
 		// 大小未知时 total 为 -1，进度仍可上报完成事件。
 		total = -1
 	}
+
 	watcher := task.NewQuarterWatcher(task.Progress{URL: url, Downloaded: 0, Total: total}, onProgress)
 
 	// 写入 Disk 存储；writer 计数用于进度计算。
 	var counter countWriter
+
 	writeErr := storage.Write(ctx, d.storage, ref.localName(), func(w io.Writer) error {
 		counter.Writer = w
 		return d.doDownload(ctx, ref, &counter, url, watcher, total)
@@ -115,10 +118,12 @@ func (d *cameraDownloader) doDownload(ctx context.Context, ref fileRef, w io.Wri
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+
 	cam, err := d.cam()
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrNoCamera, err)
 	}
+
 	err = cam.DownloadTo(ctx, ref.folder, ref.name, w)
 	if err != nil {
 		return err
@@ -134,6 +139,7 @@ func (d *cameraDownloader) fileSize(ctx context.Context, ref fileRef) (int64, er
 	if err != nil {
 		return -1, err
 	}
+
 	file, err := cam.GetFileInfo(ctx, ref.folder, ref.name)
 	if err != nil {
 		return -1, err

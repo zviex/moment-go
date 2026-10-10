@@ -24,13 +24,9 @@ type taskHandle struct {
 	inner *taskInstance
 }
 
-// taskID 返回任务唯一标识。
-func (h *taskHandle) taskID() string { return h.id }
-
 // inner 方法转发到泛型任务。
 
 func (h *taskHandle) Pause()             { h.inner.Pause() }
-func (h *taskHandle) Resume()            { h.inner.Resume() }
 func (h *taskHandle) Cancel()            { h.inner.Cancel() }
 func (h *taskHandle) Status() taskStatus { return h.inner.Status() }
 func (h *taskHandle) Snapshot()          { h.inner.Snapshot() }
@@ -86,7 +82,7 @@ func (m *manager) create(ctx context.Context, urls []string) (*taskHandle, error
 
 	root := m.root(ctx)
 
-	downloader := New(WithStorage(&storage.Disk{}))
+	downloader := New(WithStorage(storage.Default()))
 
 	t := task.New(
 		task.Config[taskStatus, fileStatus, *downloadv1.MonitorTaskResponse]{
@@ -136,6 +132,9 @@ func (m *manager) remove(id string) {
 	defer m.mu.Unlock()
 	delete(m.tasks, id)
 }
+
+// taskID 返回任务唯一标识。
+func (h *taskHandle) taskID() string { return h.id }
 
 // makeWork 把共享的 Downloader 包装成泛型任务要求的 WorkFunc。
 func makeWork(d Downloader) task.WorkFunc {

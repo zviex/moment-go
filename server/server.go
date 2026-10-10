@@ -71,6 +71,7 @@ func (l loggingListener) Accept() (net.Conn, error) {
 		if !errors.Is(err, net.ErrClosed) {
 			slog.Debug("grpc accept failed", "err", err)
 		}
+
 		return nil, err
 	}
 
@@ -78,5 +79,6 @@ func (l loggingListener) Accept() (net.Conn, error) {
 		"remote", c.RemoteAddr().String(),
 		"local", c.LocalAddr().String(),
 	)
+
 	return c, nil
 }

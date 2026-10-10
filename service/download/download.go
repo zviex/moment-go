@@ -20,13 +20,16 @@ func (download) CreateTask(ctx context.Context, req *downloadv1.CreateTaskReques
 	if req == nil || len(req.GetUrls()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "download: empty url list")
 	}
+
 	if err := ctx.Err(); err != nil {
 		return nil, status.FromContextError(err).Err()
 	}
+
 	t, err := defaultManager.create(ctx, req.GetUrls())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "download: create task: %v", err)
 	}
+
 	return &downloadv1.CreateTaskResponse{
 		TaskId:     t.taskID(),
 		TotalFiles: int32(len(req.GetUrls())),
@@ -38,6 +41,7 @@ func (download) MonitorTask(req *downloadv1.MonitorTaskRequest, stream grpc.Serv
 	if req == nil || req.GetTaskId() == "" {
 		return status.Error(codes.InvalidArgument, "download: missing task id")
 	}
+
 	t, ok := defaultManager.get(req.GetTaskId())
 	if !ok {
 		return status.Error(codes.NotFound, "download: task not found")
@@ -50,6 +54,7 @@ func (download) MonitorTask(req *downloadv1.MonitorTaskRequest, stream grpc.Serv
 	t.Snapshot()
 
 	ctx := stream.Context()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -60,6 +65,7 @@ func (download) MonitorTask(req *downloadv1.MonitorTaskRequest, stream grpc.Serv
 			if !ok {
 				return nil
 			}
+
 			if err := stream.Send(ev); err != nil {
 				return err
 			}
@@ -72,6 +78,7 @@ func (download) ControlTask(ctx context.Context, req *downloadv1.ControlTaskRequ
 	if req == nil || req.GetTaskId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "download: missing task id")
 	}
+
 	t, ok := defaultManager.get(req.GetTaskId())
 	if !ok {
 		return nil, status.Error(codes.NotFound, "download: task not found")
@@ -82,22 +89,23 @@ func (download) ControlTask(ctx context.Context, req *downloadv1.ControlTaskRequ
 		if req.GetAction() != downloadv1.ControlAction_CONTROL_ACTION_CANCEL {
 			return nil, status.Error(codes.Unimplemented, "download: single-file control only supports cancel")
 		}
+
 		if t.RemoveFromQueue(req.GetUrl()) {
 			return okResponse("file removed from download queue"), nil
 		}
+
 		return nil, status.Error(codes.NotFound, "download: file not in queue or in-flight")
 	}
 
 	switch req.GetAction() {
 	case downloadv1.ControlAction_CONTROL_ACTION_PAUSE:
 		t.Pause()
-	case downloadv1.ControlAction_CONTROL_ACTION_RESUME:
-		t.Resume()
 	case downloadv1.ControlAction_CONTROL_ACTION_CANCEL:
 		t.Cancel()
 	default:
 		return nil, status.Error(codes.InvalidArgument, "download: unknown control action")
 	}
+
 	return okResponse("ok"), nil
 }
 

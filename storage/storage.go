@@ -1,69 +1,81 @@
 package storage
 
 import (
-	"bufio"
 	"context"
+	"errors"
 	"io"
-	"os"
+	"io/fs"
 	"path/filepath"
-	"sync"
+	"time"
 )
 
+var ErrNotExist = fs.ErrNotExist
+
+var ErrInvalidName = errors.New("storage: invalid file name")
+
+type FileInfo struct {
+	Name    string
+	Size    int64
+	ModTime time.Time
+}
+
+// Storage 是通用文件存储接口。name 始终是相对于存储根的、使用 "/" 分隔的路径。
+//
+// 实现约定：
+//   - Create 返回的 WriteCloser 在 Close 成功后才算提交；Close 前内容不保证可见。
+//   - Create/Open 等需尊重 ctx 取消。
+//   - 不存在的对象返回的错误需满足 errors.Is(err, ErrNotExist)。
 type Storage interface {
-	Path() string
+	Create(ctx context.Context, name string) (io.WriteCloser, error)
+	Open(ctx context.Context, name string) (io.ReadCloser, error)
+	Stat(ctx context.Context, name string) (FileInfo, error)
+	Remove(ctx context.Context, name string) error
 }
 
-type (
-	Cache struct{}
-	Disk  struct{}
-)
-
-// diskBase 是 Disk 存储的物理根目录。所有下载的图片文件都落盘在这里，绝不用 cache。
-var (
-	diskMu   sync.Mutex
-	diskBase = filepath.Join("moment", "data")
-)
-
-// SetDiskBase 覆盖 Disk 存储的根目录（例如读取配置后调用，需先于首次写入）。
-func SetDiskBase(dir string) {
-	diskMu.Lock()
-	defer diskMu.Unlock()
-	diskBase = dir
-}
-
-// Path 返回 Disk 存储的根目录，首次调用时会惰性创建该目录。
-func (d *Disk) Path() string {
-	diskMu.Lock()
-	dir := diskBase
-	diskMu.Unlock()
-	_ = os.MkdirAll(dir, 0o755)
-	return dir
-}
-
-func (c *Cache) Path() string {
-	return os.TempDir()
-}
-
-func Read(ctx context.Context, s Storage, name string) (io.Reader, error) {
-	return read(ctx, s, name)
-}
-
-func Write(ctx context.Context, s Storage, name string, writeFunc func(io.Writer) error) error {
-	return write(ctx, s, name, writeFunc)
-}
-
-func read(ctx context.Context, s Storage, name string) (io.Reader, error) {
+// Read 打开 name 的内容，调用方负责 Close。
+func Read(ctx context.Context, s Storage, name string) (io.ReadCloser, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	file, err := os.Open(filepath.Join(s.Path(), name))
-	if err != nil {
-		return nil, err
-	}
-	return bufio.NewReader(file), nil
+
+	return s.Open(ctx, name)
 }
 
-// ctxWriter 在每次写入前检查 ctx，使落盘过程可被取消。
+// Write 通过 writeFunc 把内容写入 name。
+// 写入过程可被 ctx 取消；失败时尽力删除未完成的对象。
+func Write(ctx context.Context, s Storage, name string, writeFunc func(io.Writer) error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	w, err := s.Create(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	if err := writeFunc(ctxWriter{ctx: ctx, w: w}); err != nil {
+		_ = w.Close()
+		_ = s.Remove(context.WithoutCancel(ctx), name)
+
+		return err
+	}
+
+	if err := ctx.Err(); err != nil {
+		_ = w.Close()
+		_ = s.Remove(context.WithoutCancel(ctx), name)
+
+		return err
+	}
+
+	if err := w.Close(); err != nil {
+		_ = s.Remove(context.WithoutCancel(ctx), name)
+		return err
+	}
+
+	return nil
+}
+
+// ctxWriter 在每次写入前检查 ctx，使写入过程可被取消。
 type ctxWriter struct {
 	ctx context.Context
 	w   io.Writer
@@ -73,32 +85,24 @@ func (cw ctxWriter) Write(p []byte) (int, error) {
 	if err := cw.ctx.Err(); err != nil {
 		return 0, err
 	}
+
 	return cw.w.Write(p)
 }
 
-func write(ctx context.Context, s Storage, name string, writeFunc func(io.Writer) error) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	dir := s.Path()
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	file, err := os.Create(filepath.Join(dir, name))
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	bufWriter := bufio.NewWriter(file)
-
-	if err := writeFunc(ctxWriter{ctx: ctx, w: bufWriter}); err != nil {
-		return err
+// CleanName 校验并规范化对象名：去掉前导 "/"、统一分隔符，拒绝越出根目录的路径。
+func CleanName(name string) (string, error) {
+	n := filepath.ToSlash(name)
+	for len(n) > 0 && n[0] == '/' {
+		n = n[1:]
 	}
 
-	if err := ctx.Err(); err != nil {
-		return err
+	if n == "" {
+		return "", ErrInvalidName
 	}
 
-	return bufWriter.Flush()
+	if !filepath.IsLocal(filepath.FromSlash(n)) {
+		return "", ErrInvalidName
+	}
+
+	return filepath.ToSlash(filepath.Clean(filepath.FromSlash(n))), nil
 }

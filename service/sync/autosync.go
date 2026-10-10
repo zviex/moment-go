@@ -11,7 +11,6 @@ import (
 
 var errNoSource = errors.New("autosync: capture source not set")
 
-// CaptureEvent 表示相机一次拍摄产生的一个新文件。
 type CaptureEvent struct {
 	URL string
 	At  time.Time
@@ -24,8 +23,8 @@ type CaptureSource interface {
 
 // Recorder 并发安全由 run 的 atomic.Pointer CAS/Swap 保证，内部无锁。
 type Recorder struct {
-	// 构造期注入，之后只读。rootCtx 为应用级根 ctx：其取消会终止自动同步。
-	rootCtx    context.Context
+	rootCtx context.Context
+
 	downloader download.Downloader
 	source     CaptureSource
 
@@ -39,9 +38,6 @@ type recorderRun struct {
 
 // NewRecorder 构造 Recorder：rootCtx 为应用级根 ctx，source/downloader 构造期注入。
 func NewRecorder(rootCtx context.Context, source CaptureSource, downloader download.Downloader) *Recorder {
-	if rootCtx == nil {
-		rootCtx = context.Background()
-	}
 	return &Recorder{rootCtx: rootCtx, source: source, downloader: downloader}
 }
 
@@ -51,7 +47,7 @@ func NewDefaultRecorder(rootCtx context.Context, source CaptureSource) *Recorder
 }
 
 // defaultRecorder 为全局共享实例；rootCtx/source 由 Init 阶段注入。
-var defaultRecorder = NewDefaultRecorder(nil, nil)
+var defaultRecorder = NewDefaultRecorder(context.Background(), nil)
 
 // Enable 开启自动同步：开始监听拍摄事件并下载每个新拍文件。
 // 已在运行时重复调用无副作用。未注入 source 时返回错误。
@@ -81,7 +77,6 @@ func (r *Recorder) Disable() {
 	}
 }
 
-// Enabled 返回自动同步是否开启。
 func (r *Recorder) Enabled() bool {
 	return r.run.Load() != nil
 }

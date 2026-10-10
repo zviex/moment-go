@@ -11,6 +11,8 @@ func Init(ctx context.Context) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	defaultRecorder = NewDefaultRecorder(ctx, nil)
+
 	registry.Register(syncv1.AutoSyncService_ServiceDesc, sync{})
 }
