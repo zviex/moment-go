@@ -14,45 +14,65 @@
 > `CGO_ENABLED=0` 构建时使用桩后端（`ErrBackendUnavailable`），
 > 保证**可编译、可单测、可演示 API 与生命周期流程**。
 
-## 架构（整洁架构）
+## 架构（组合根 + 最小接口）
 
 ```mermaid
 graph TD
-    A[pkg/moment 对外 API] --> B[internal/usecase 用例层<br/>生命周期状态机 · 用例编排]
-    B --> C[internal/domain 领域层<br/>实体 · 端口接口]
-    B --> D[internal/adapter/gphoto2 适配层<br/>libgphoto2 cgo 绑定]
-    C --> D
-    D --> E[libgphoto2-android/include<br/>跨平台头文件]
-    D --> F[系统 libgphoto2（Linux / macOS）<br/>或随 APK 打包的 .so（Android）]
+    A[app/main] --> B[box 组合根]
+    B --> C[adapter/gphoto2<br/>libgphoto2 cgo 绑定]
+    B --> D[pkg/moment<br/>Client · Camera Session]
+    B --> E[service/*<br/>camera · connection · download · sync]
+    B --> F[server/mnet/storage/config]
+    E --> D
+    E --> G[adapter 端口]
+    C -. 实现 Connector / Discoverer / Session .-> D
 ```
 
-依赖方向由外向内，领域层不依赖任何外部实现；适配层实现领域层定义的端口接口。
+依赖方向由组合根统一装配：`box` 创建所有长生命周期实例并通过最小接口注入，
+服务与适配器不再使用 `Default()` 之类的包级单例。
+
+相机侧只保留一层抽象：`adapter/gphoto2` 的 cgo 绑定直接实现
+`pkg/moment` 中按职责拆分的接口：
+
+- `Connector`：建立连接
+- `Discoverer`：自动发现相机
+- `ReadOnlyFS`：列出目录 / 文件、读取文件信息与内容
+- `Session`：组合 `ReadOnlyFS` + 相机元信息 + 生命周期
+
+`moment.Client` 只负责生命周期与连接复用；`moment.Camera` 是已连接会话的门面。
+服务所需的端口（`CameraSource` / `CameraConnector` / `Camera` / `Downloader` /
+`CaptureSource` / `ConfigStore`）集中定义在 `adapter/ports.go`，由组合根把实现注入服务，
+避免接口散落在各 service 包中。
+原本的 `domain.Gateway`、`usecase` 与 `pool/client` 单例层已移除。
 
 **目录结构**
 
 ```
 moment-go/
 ├── go.mod
-├── app/main.go                    # demo（本地桩环境即可运行）
-├── pkg/moment/                    # delivery：对外公共 API
-│   ├── moment.go                  # Client / Camera
-│   ├── types.go                   # 公共类型与错误哨兵
-│   └── options.go                 # libgphoto2 库目录选项
-└── internal/
-    ├── domain/                    # 领域层：实体 + 端口 + 错误
-    │   ├── types.go               # Camera / File / ConfigItem / State ...
-    │   ├── gateway.go             # Gateway / CameraSession 接口
-    │   └── errors.go
-    ├── usecase/                   # 用例层：生命周期 + 用例编排
-    │   ├── lifecycle.go           # 状态机
-    │   └── app.go                 # Connect / ListTree / Download / GetInfo ...
-    └── adapter/gphoto2/           # 适配层：cgo 绑定（全平台）+ 桩（CGO_ENABLED=0）
-        ├── bindings.go            # #cgo 指令（头文件 / 链接）
-        ├── context.go             # GPContext 生命周期
-        ├── gateway.go             # cgo 后端实现（PTP/IP、浏览、下载、解析）
-        ├── gateway_stub.go        # 无 cgo 时的默认桩实现
-        ├── bootstrap.go           # CAMLIBS / IOLIBS 环境变量
-        └── result.go              # 返回码 → 领域错误
+├── app/main.go                    # 入口：创建 box 并运行 gRPC 服务
+├── box/                           # 组合根：集中构造依赖图
+├── adapter/                       # 端口（接口）+ 后端实现
+│   ├── ports.go                   # 服务依赖的最小接口
+│   └── gphoto2/                   # libgphoto2 后端（cgo + 无 cgo 桩）
+│       ├── bindings.go            # #cgo 指令（头文件 / 链接）
+│       ├── context.go             # GPContext 生命周期
+│       ├── client.go              # Client（Connector / Discoverer）+ Camera Session
+│       ├── bootstrap.go           # CAMLIBS / IOLIBS 环境变量
+│       └── result.go              # 返回码 → 公共错误
+├── pkg/moment/                    # 对外 API 与最小接口
+│   ├── backend.go                 # Connector / Discoverer / ReadOnlyFS / Session
+│   ├── client.go                  # 生命周期与连接复用
+│   ├── camera.go                  # 会话门面 + ListTree / Download
+│   └── types.go                   # 公共类型与错误
+├── service/                       # gRPC 服务（构造期注入依赖）
+│   ├── camera/
+│   ├── connection/
+│   ├── download/
+│   └── sync/
+├── server/                        # gRPC Server + 监听网络（无全局单例）
+├── storage/                       # 通用文件存储
+└── config/                        # 运行期配置存储（无全局单例）
 ```
 
 ## 生命周期
@@ -72,64 +92,50 @@ stateDiagram-v2
 
 ## 快速开始
 
+应用侧通过组合根创建全部依赖：
+
 ```go
-package main
+ctx := context.Background()
 
-import (
-	"context"
-	"fmt"
-
-	"ci.zevix.uk/moment-go/pkg/moment"
-	connectionv1 "ci.zevix.uk/moment-go/protogo/connection/v1"
-)
-
-func main() {
-	ctx := context.Background()
-
-	// 创建客户端。桌面端默认使用系统安装的 libgphoto2；
-	// Android 上先解压 .so，再传入布局根目录：
-	// client, err := moment.New(moment.WithLibraryRoot(filesDir))
-	client, err := moment.New()
-	if err != nil {
-		panic(err)
-	}
-
-	// 1) 连接：PTP/IP 网络连接（相机 WiFi/IP 模式）
-	cam, err := client.Connect(ctx, moment.ConnectOptions{
-		Type: connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP,
-		Host: "192.168.1.100",
-	})
-	if err != nil {
-		panic(err)
-	}
-	defer cam.Close(ctx)
-
-	// 2) 预览所有相机内容（递归遍历目录树）
-	content, err := cam.ListTree(ctx)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("folders=%d files=%d\n", len(content.Folders), len(content.Files))
-
-	// 3) 下载第一个文件
-	if len(content.Files) > 0 {
-		f := content.Files[0]
-		data, err := cam.Download(ctx, f.Folder, f.Name)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Printf("downloaded %s (%d bytes)\n", f.Name, len(data))
-	}
-
-	// 4) 解析相机信息
-	info, err := cam.GetInfo(ctx)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(info.Summary)
-
-	_ = client.Disconnect(ctx)
+app, err := box.New(ctx, box.Options{
+    // Android 可指定随 APK 解压出来的驱动目录：
+    // LibraryRoot: filesDir,
+    DataDir: "moment/data",
+})
+if err != nil {
+    panic(err)
 }
+defer app.Close()
+
+if err := app.Run(ctx); err != nil {
+    panic(err)
+}
+```
+
+作为库使用时，自行注入后端即可；`pkg/moment` 不依赖具体适配器：
+
+```go
+backend, err := gphoto2.New(gphoto2.WithLibraryRoot(root))
+if err != nil {
+    panic(err)
+}
+
+client := moment.NewClient(backend, backend)
+
+cam, err := client.Connect(ctx, moment.ConnectOptions{
+    Type: connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP,
+    Host: "192.168.1.100",
+})
+if err != nil {
+    panic(err)
+}
+defer cam.Close(ctx)
+
+content, err := cam.ListTree(ctx)
+if err != nil {
+    panic(err)
+}
+fmt.Printf("folders=%d files=%d\n", len(content.Folders), len(content.Files))
 ```
 
 ### USB 连接
@@ -235,7 +241,7 @@ Android 交叉编译（生成 `bin/app-android-arm64`），全部通过才视为
 ## 运行时部署（Android）
 
 libgphoto2 通过环境变量定位驱动（插件）目录。宿主平台无需设置——libgphoto2 会使用
-自身编译期默认路径搜索系统安装的驱动；Android 上由 `moment.WithLibraryRoot` 设置：
+自身编译期默认路径搜索系统安装的驱动；Android 上由 `box.Options.LibraryRoot` / `gphoto2.WithLibraryRoot` 设置：
 
 ```
 CAMLIBS  = <root>/libgphoto2/<版本>/        # ptp2.so 等相机驱动
@@ -247,7 +253,7 @@ IOLIBS   = <root>/libgphoto2_port/<版本>/   # ptpip.so、usb1.so 等端口驱�
 将 `libgphoto2-android/jniLibs/arm64-v8a/` 中的 `.so` 打包进 APK 的 `jniLibs`
 （确保 `libgphoto2.so`、`libgphoto2_port.so`、`libltdl.so`、`libusb-1.0.so` 在 APK 内），
 应用启动后把 camlib / iolib 的 `.so` 解压到应用 `files` 目录（如 `filesDir/libgphoto2/2.5.34.1/`、
-`filesDir/libgphoto2_port/0.12.2/`），再以 `moment.WithLibraryRoot(filesDir)` 创建客户端。
+`filesDir/libgphoto2_port/0.12.2/`），再以 `gphoto2.WithLibraryRoot(filesDir)` / `box.Options.LibraryRoot` 配置后端。
 
 > camlib/iolib 的文件名无需与原始一致（加载器按符号发现插件），
 > 直接复制 `jniLibs` 中重命名的 `libgphoto2_camlib_ptp2.so` 等亦可。

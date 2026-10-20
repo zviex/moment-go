@@ -15,33 +15,11 @@ type Net interface {
 	Cleanup() error
 }
 
-var _default Net
-
-func DefaultNet() Net {
-	return _default
-}
-
-func SetDefaultNet(n Net) {
-	_default = n
-}
-
-func Init() {
-	SetDefaultNet(NewUnix())
-}
-
 type Non struct{}
 
-func (Non) Network() string {
-	return "non"
-}
-
-func (Non) Addr() string {
-	return "non"
-}
-
-func (Non) Cleanup() error {
-	return nil
-}
+func (Non) Network() string { return "non" }
+func (Non) Addr() string    { return "non" }
+func (Non) Cleanup() error  { return nil }
 
 type Unix struct {
 	addr string
@@ -57,13 +35,8 @@ func NewUnixAt(addr string) *Unix {
 	return &Unix{addr: addr}
 }
 
-func (u Unix) Network() string {
-	return "unix"
-}
-
-func (u Unix) Addr() string {
-	return u.addr
-}
+func (u Unix) Network() string { return "unix" }
+func (u Unix) Addr() string    { return u.addr }
 
 func (u Unix) Cleanup() error {
 	slog.Debug("unix socket cleanup", "addr", u.addr)
@@ -71,6 +44,5 @@ func (u Unix) Cleanup() error {
 		slog.Debug("unix socket cleanup failed", "addr", u.addr, "err", err)
 		return err
 	}
-
 	return nil
 }

@@ -6,46 +6,18 @@ import (
 	"fmt"
 	"io"
 
-	"ci.zevix.uk/moment-go/pkg/moment"
+	"ci.zevix.uk/moment-go/adapter"
 	"ci.zevix.uk/moment-go/pkg/task"
 	"ci.zevix.uk/moment-go/storage"
 )
 
-// Downloader 抽象"从相机下载一个文件并写入 Disk 存储"这一行为。
-// 这是 task 手动下载与 autosync 自动同步共享的下载行为：
-// 两种使用方都只依赖本接口，而不关心底层是 libgphoto2 还是未来新的传输方式。
-type Downloader interface {
-	// Download 下载 url 指向的相机文件，并通过 onProgress 上报实时进度。
-	// ctx 取消（Pause/Cancel/移除队列）时，正在进行的传输会尽快中断。
-	Download(ctx context.Context, url string, onProgress func(task.Progress)) error
-}
+var (
+	ErrNoCamera  = errors.New("download: camera session unavailable")
+	ErrNoStorage = errors.New("download: storage unavailable")
+)
 
-var ErrNoCamera = errors.New("download: camera session unavailable")
-
-// New 构造一个使用默认相机（client.Default().Camera()）与 Disk 存储的下载器。
-// 默认写入 Disk；该构造是可选的便捷入口，方法把具体存储通过选项传入。
-func New(opts ...Option) Downloader {
-	c := &cameraDownloader{storage: storage.Default()}
-
-	for _, o := range opts {
-		if o != nil {
-			o(c)
-		}
-	}
-	return c
-}
-
-// Option 配置下载器。
-type Option func(*cameraDownloader)
-
-// WithStorage 指定下载文件写入的存储（默认 Disk）。
-func WithStorage(s storage.Storage) Option {
-	return func(d *cameraDownloader) { d.storage = s }
-}
-
-// WithCamera 指定相机会话来源（默认 client.Default().Camera()）。
-func WithCamera(cam func() (*moment.Camera, error)) Option {
-	return func(d *cameraDownloader) { d.cam = cam }
+func NewCameraDownloader(cam adapter.CameraProvider, store storage.Storage) adapter.Downloader {
+	return &cameraDownloader{cam: cam, storage: store}
 }
 
 // countWriter 包装底层 writer 并对写入字节计数，从而实现进度上报。
@@ -61,27 +33,25 @@ func (w *countWriter) Write(p []byte) (int, error) {
 }
 
 type cameraDownloader struct {
-	cam     func() (*moment.Camera, error)
+	cam     adapter.CameraProvider
 	storage storage.Storage
 }
 
-// Download 解析 url 为相机内 fileRef，把文件内容写入 Disk 存储，
+// Download 解析 url 为相机内 fileRef，把文件内容写入存储，
 // 并在开始、1/4 阈值、完成时触发 onProgress。
 func (d *cameraDownloader) Download(ctx context.Context, url string, onProgress func(task.Progress)) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if d.storage == nil {
+		return ErrNoStorage
+	}
+	if d.cam == nil {
+		return ErrNoCamera
+	}
 
 	if onProgress == nil {
 		onProgress = func(task.Progress) {}
-	}
-
-	if d.storage == nil {
-		d.storage = storage.Default()
-	}
-
-	if d.cam == nil {
-		d.cam = momentClientCamera
 	}
 
 	ref := parseFileRef(url)
@@ -94,7 +64,7 @@ func (d *cameraDownloader) Download(ctx context.Context, url string, onProgress 
 
 	watcher := task.NewQuarterWatcher(task.Progress{URL: url, Downloaded: 0, Total: total}, onProgress)
 
-	// 写入 Disk 存储；writer 计数用于进度计算。
+	// 写入存储；writer 计数用于进度计算。
 	var counter countWriter
 
 	writeErr := storage.Write(ctx, d.storage, ref.localName(), func(w io.Writer) error {

@@ -17,7 +17,7 @@ import (
 // 搜索系统安装的驱动目录，无需额外配置。
 //
 // Android 上驱动不在系统路径中，需要把随 APK 打包的驱动解压到可读目录
-// （例如应用 files 目录），再用 Bootstrap / moment.WithLibraryRoot 指定。
+// （例如应用 files 目录），再用 Bootstrap / gphoto2.WithLibraryRoot 指定。
 const (
 	camlibParentDir = "libgphoto2"
 	iolibParentDir  = "libgphoto2_port"

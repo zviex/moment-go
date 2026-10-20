@@ -4,29 +4,18 @@ import (
 	"context"
 	"errors"
 	"sync/atomic"
-	"time"
 
-	"ci.zevix.uk/moment-go/service/download"
+	"ci.zevix.uk/moment-go/adapter"
 )
 
 var errNoSource = errors.New("autosync: capture source not set")
-
-type CaptureEvent struct {
-	URL string
-	At  time.Time
-}
-
-type CaptureSource interface {
-	// Events 返回拍摄事件通道；ctx 取消时该通道关闭。
-	Events(ctx context.Context) (<-chan CaptureEvent, error)
-}
 
 // Recorder 并发安全由 run 的 atomic.Pointer CAS/Swap 保证，内部无锁。
 type Recorder struct {
 	rootCtx context.Context
 
-	downloader download.Downloader
-	source     CaptureSource
+	downloader adapter.Downloader
+	source     adapter.CaptureSource
 
 	// 运行态：nil = disabled；非 nil = 正在运行。
 	run atomic.Pointer[recorderRun]
@@ -36,18 +25,12 @@ type recorderRun struct {
 	cancel context.CancelFunc
 }
 
-// NewRecorder 构造 Recorder：rootCtx 为应用级根 ctx，source/downloader 构造期注入。
-func NewRecorder(rootCtx context.Context, source CaptureSource, downloader download.Downloader) *Recorder {
+func NewRecorder(rootCtx context.Context, source adapter.CaptureSource, downloader adapter.Downloader) *Recorder {
+	if rootCtx == nil {
+		rootCtx = context.Background()
+	}
 	return &Recorder{rootCtx: rootCtx, source: source, downloader: downloader}
 }
-
-// NewDefaultRecorder 构造使用共享 Downloader 的 Recorder。
-func NewDefaultRecorder(rootCtx context.Context, source CaptureSource) *Recorder {
-	return NewRecorder(rootCtx, source, download.New())
-}
-
-// defaultRecorder 为全局共享实例；rootCtx/source 由 Init 阶段注入。
-var defaultRecorder = NewDefaultRecorder(context.Background(), nil)
 
 // Enable 开启自动同步：开始监听拍摄事件并下载每个新拍文件。
 // 已在运行时重复调用无副作用。未注入 source 时返回错误。
@@ -104,7 +87,7 @@ func (r *Recorder) runLoop(ctx context.Context) {
 }
 
 // syncFile 把单个拍摄事件对应的文件同步到 Disk。
-func (r *Recorder) syncFile(parent context.Context, ev CaptureEvent) {
+func (r *Recorder) syncFile(parent context.Context, ev adapter.CaptureEvent) {
 	if ev.URL == "" {
 		return
 	}

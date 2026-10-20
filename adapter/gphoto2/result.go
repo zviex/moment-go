@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"ci.zevix.uk/moment-go/internal/domain"
+	"ci.zevix.uk/moment-go/pkg/moment"
 )
 
 // libgphoto2 返回码，取值与 libgphoto2-android/include/gphoto2/gphoto2-result.h、
@@ -92,19 +92,19 @@ func resultToError(code int) error {
 	var sentinel error
 	switch code {
 	case gpErrorModelNotFound:
-		sentinel = domain.ErrModelNotFound
+		sentinel = moment.ErrModelNotFound
 	case gpErrorDirectoryNotFound:
-		sentinel = domain.ErrDirectoryNotFound
+		sentinel = moment.ErrDirectoryNotFound
 	case gpErrorFileNotFound:
-		sentinel = domain.ErrFileNotFound
+		sentinel = moment.ErrFileNotFound
 	case gpErrorCameraBusy:
-		sentinel = domain.ErrCameraBusy
+		sentinel = moment.ErrCameraBusy
 	case gpErrorCancel:
-		sentinel = domain.ErrCancelled
+		sentinel = moment.ErrCancelled
 	case gpErrorOSFailure, gpErrorIO:
-		sentinel = domain.ErrOSFailure
+		sentinel = moment.ErrOSFailure
 	case gpErrorNotSupported:
-		sentinel = domain.ErrUnsupported
+		sentinel = moment.ErrUnsupported
 	}
 	name := resultName[code]
 	if name == "" {

@@ -3,17 +3,22 @@ package camera
 import (
 	"context"
 
-	"ci.zevix.uk/moment-go/pool/client"
+	"ci.zevix.uk/moment-go/adapter"
 	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type cameraService struct {
+type Service struct {
 	camerav1.UnimplementedCameraServiceServer
+	cameras adapter.CameraSource
 }
 
-func (cameraService) GetSummary(ctx context.Context, req *camerav1.GetSummaryRequest) (*camerav1.GetSummaryResponse, error) {
-	c, err := client.Default().Camera()
+func New(cameras adapter.CameraSource) *Service {
+	return &Service{cameras: cameras}
+}
+
+func (s *Service) GetSummary(ctx context.Context, req *camerav1.GetSummaryRequest) (*camerav1.GetSummaryResponse, error) {
+	c, err := s.cameras.Camera()
 	if err != nil {
 		return nil, err
 	}
@@ -28,11 +33,11 @@ func (cameraService) GetSummary(ctx context.Context, req *camerav1.GetSummaryReq
 	}, nil
 }
 
-func (cameraService) ListFiles(ctx context.Context, req *camerav1.ListFilesRequest) (*camerav1.ListFilesResponse, error) {
+func (s *Service) ListFiles(ctx context.Context, req *camerav1.ListFilesRequest) (*camerav1.ListFilesResponse, error) {
 	// 此处返回文件并不返回关于缩略图，防止加载过多缩略图导致接口面板，UI响应迟缓，使用异步加载缩略图数据
 	fileInfo := make([]*camerav1.FileEntry, 0)
 
-	c, err := client.Default().Camera()
+	c, err := s.cameras.Camera()
 	if err != nil {
 		return nil, err
 	}
@@ -62,10 +67,10 @@ func (cameraService) ListFiles(ctx context.Context, req *camerav1.ListFilesReque
 	}, nil
 }
 
-func (cameraService) ListFolders(ctx context.Context, req *camerav1.ListFoldersRequest) (*camerav1.ListFoldersResponse, error) {
+func (s *Service) ListFolders(ctx context.Context, req *camerav1.ListFoldersRequest) (*camerav1.ListFoldersResponse, error) {
 	entries := make([]*camerav1.FileEntry, 0)
 
-	c, err := client.Default().Camera()
+	c, err := s.cameras.Camera()
 	if err != nil {
 		return nil, err
 	}

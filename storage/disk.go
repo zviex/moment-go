@@ -9,7 +9,8 @@ import (
 
 const DiskKind = "disk"
 
-var DefaultDiskRoot = filepath.Join("moment", "data")
+// DefaultDataDir 返回默认数据目录（相对于工作目录）。
+func DefaultDataDir() string { return filepath.Join("moment", "data") }
 
 type Disk struct {
 	root string
@@ -17,7 +18,7 @@ type Disk struct {
 
 func NewDisk(root string) *Disk {
 	if root == "" {
-		root = DefaultDiskRoot
+		root = DefaultDataDir()
 	}
 
 	return &Disk{root: root}

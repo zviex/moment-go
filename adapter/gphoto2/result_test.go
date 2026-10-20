@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"ci.zevix.uk/moment-go/internal/domain"
+	"ci.zevix.uk/moment-go/pkg/moment"
 )
 
 func TestResultToError(t *testing.T) {
@@ -17,14 +17,14 @@ func TestResultToError(t *testing.T) {
 		code  int
 		error error
 	}{
-		{gpErrorModelNotFound, domain.ErrModelNotFound},
-		{gpErrorDirectoryNotFound, domain.ErrDirectoryNotFound},
-		{gpErrorFileNotFound, domain.ErrFileNotFound},
-		{gpErrorCameraBusy, domain.ErrCameraBusy},
-		{gpErrorCancel, domain.ErrCancelled},
-		{gpErrorOSFailure, domain.ErrOSFailure},
-		{gpErrorIO, domain.ErrOSFailure},
-		{gpErrorNotSupported, domain.ErrUnsupported},
+		{gpErrorModelNotFound, moment.ErrModelNotFound},
+		{gpErrorDirectoryNotFound, moment.ErrDirectoryNotFound},
+		{gpErrorFileNotFound, moment.ErrFileNotFound},
+		{gpErrorCameraBusy, moment.ErrCameraBusy},
+		{gpErrorCancel, moment.ErrCancelled},
+		{gpErrorOSFailure, moment.ErrOSFailure},
+		{gpErrorIO, moment.ErrOSFailure},
+		{gpErrorNotSupported, moment.ErrUnsupported},
 	}
 	for _, c := range cases {
 		err := resultToError(c.code)

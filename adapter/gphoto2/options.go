@@ -1,6 +1,6 @@
-package moment
+package gphoto2
 
-// Option 配置 Client 的可选项。
+// Option 配置 libgphoto2 后端。
 type Option func(*options)
 
 type options struct {
@@ -13,12 +13,7 @@ type options struct {
 //
 // 不设置时使用平台默认行为：Linux / macOS 由 libgphoto2 搜索系统安装的驱动目录；
 // Android 上驱动不在系统路径中，需要把随 APK 打包的 .so 解压到可读目录
-// （例如应用 files 目录），目录内应包含：
-//
-//	<root>/libgphoto2/<版本>/        # camlib（ptp2.so 等）
-//	<root>/libgphoto2_port/<版本>/   # iolib（ptpip.so、usb1.so 等）
-//
-// 版本号目录会被自动探测；该选项会把对应的 CAMLIBS / IOLIBS 环境变量设置好。
+// （例如应用 files 目录）。
 func WithLibraryRoot(root string) Option {
 	return func(o *options) {
 		o.libraryRoot = root
@@ -31,4 +26,14 @@ func WithLibraryDirs(camlibDir, iolibDir string) Option {
 		o.camlibDir = camlibDir
 		o.iolibDir = iolibDir
 	}
+}
+
+func applyOptions(opts []Option) options {
+	var o options
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&o)
+		}
+	}
+	return o
 }

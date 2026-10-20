@@ -26,9 +26,9 @@
 package gphoto2
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../../../libgphoto2-android/include
+#cgo CFLAGS: -I${SRCDIR}/../../libgphoto2-android/include
 #cgo LDFLAGS: -lgphoto2 -lgphoto2_port -lltdl -lm
 #cgo darwin LDFLAGS: -L/opt/homebrew/lib -L/usr/local/lib
-#cgo android LDFLAGS: -L${SRCDIR}/../../../libgphoto2-android/lib
+#cgo android LDFLAGS: -L${SRCDIR}/../../libgphoto2-android/lib
 */
 import "C"

@@ -18,9 +18,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"ci.zevix.uk/moment-go/server"
-	"ci.zevix.uk/moment-go/server/mnet"
-	"ci.zevix.uk/moment-go/service"
+	"ci.zevix.uk/moment-go/box"
 	"ci.zevix.uk/moment/moment-protogo/pkg/logger"
 	"ci.zevix.uk/moment/moment-protogo/pkg/logger/sink/victorialogs"
 )
@@ -47,12 +45,13 @@ func main() {
 
 	defer func() { _ = lg.Shutdown(context.Background()) }()
 
-	if err := service.Init(ctx); err != nil {
+	app, err := box.New(ctx, box.Options{})
+	if err != nil {
 		panic(err)
 	}
-	mnet.Init()
+	defer func() { _ = app.Close() }()
 
-	if err := server.DefaultSrv().Run(ctx); err != nil {
+	if err := app.Run(ctx); err != nil {
 		panic(err)
 	}
 }

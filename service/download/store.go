@@ -16,9 +16,6 @@ import (
 	"github.com/uptrace/bun/driver/sqliteshim"
 )
 
-// DefaultDBPath 是下载历史数据库的默认位置（相对于工作目录）。
-var DefaultDBPath = filepath.Join("moment", "data", "download.db")
-
 // ErrTaskNotFound 表示历史库中不存在该任务。
 var ErrTaskNotFound = errors.New("download: task not found in history")
 
@@ -32,7 +29,7 @@ type Store struct {
 // 未结束任务标记为失败（进程已退出，它们不可能再继续）。
 func OpenStore(ctx context.Context, path string) (*Store, error) {
 	if path == "" {
-		path = DefaultDBPath
+		path = filepath.Join("moment", "data", "download.db")
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, fmt.Errorf("download store: mkdir: %w", err)

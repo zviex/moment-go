@@ -8,11 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"ci.zevix.uk/moment-go/pkg/moment"
+	"ci.zevix.uk/moment-go/adapter"
 	"ci.zevix.uk/moment-go/pkg/pubsub"
 	"ci.zevix.uk/moment-go/pkg/task"
-	"ci.zevix.uk/moment-go/pool/client"
-	"ci.zevix.uk/moment-go/storage"
 	downloadv1 "ci.zevix.uk/moment/moment-protogo/download/v1"
 )
 
@@ -39,26 +37,29 @@ func (h *taskHandle) SubscribeEvents() *pubsub.Subscriber[*downloadv1.MonitorTas
 	return h.inner.Bus().Subscribe()
 }
 
-// manager 是任务注册表：CreateTask 创建并登记任务，MonitorTask/ControlTask
+// Manager 是任务注册表：CreateTask 创建并登记任务，MonitorTask/ControlTask
 // 通过 taskID 定位任务。
-type manager struct {
-	mu      sync.Mutex
-	tasks   map[string]*taskHandle
-	rootCtx context.Context
-	// store 为任务历史的持久化后端；为 nil 时不做持久化。
-	store *Store
+type Manager struct {
+	mu         sync.Mutex
+	tasks      map[string]*taskHandle
+	rootCtx    context.Context
+	store      *Store
+	downloader adapter.Downloader
 }
 
-var defaultManager = &manager{tasks: make(map[string]*taskHandle)}
-
-// SetStore 绑定历史持久化存储。
-func (m *manager) SetStore(s *Store) {
-	m.mu.Lock()
-	m.store = s
-	m.mu.Unlock()
+func NewManager(rootCtx context.Context, store *Store, downloader adapter.Downloader) *Manager {
+	if rootCtx == nil {
+		rootCtx = context.Background()
+	}
+	return &Manager{
+		tasks:      make(map[string]*taskHandle),
+		rootCtx:    rootCtx,
+		store:      store,
+		downloader: downloader,
+	}
 }
 
-func (m *manager) getStore() *Store {
+func (m *Manager) getStore() *Store {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.store
@@ -68,7 +69,7 @@ func (m *manager) getStore() *Store {
 const persistTimeout = 5 * time.Second
 
 // persist 把任务内部事件写入历史库。失败只记日志，不影响下载本身。
-func (m *manager) persist(taskID string, ev task.Event[taskStatus, fileStatus]) {
+func (m *Manager) persist(taskID string, ev task.Event[taskStatus, fileStatus]) {
 	s := m.getStore()
 	if s == nil {
 		return
@@ -93,24 +94,15 @@ func (m *manager) persist(taskID string, ev task.Event[taskStatus, fileStatus]) 
 }
 
 // history 从历史库读取一个已结束（或已中断）的任务。
-func (m *manager) history(ctx context.Context, id string) (*TaskRecord, error) {
-	return m.getStore().GetTask(ctx, id)
-}
-
-// SetRootContext 绑定 manager 的应用级根 ctx：新建任务挂到该 ctx 下，
-// 应用退出时取消根 ctx 即可终止所有任务与回收协程。
-func (m *manager) SetRootContext(ctx context.Context) {
-	if ctx == nil {
-		ctx = context.Background()
+func (m *Manager) history(ctx context.Context, id string) (*TaskRecord, error) {
+	s := m.getStore()
+	if s == nil {
+		return nil, ErrTaskNotFound
 	}
-	m.mu.Lock()
-	m.rootCtx = ctx
-	m.mu.Unlock()
+	return s.GetTask(ctx, id)
 }
 
-// root 返回 manager 的根 ctx；未设置时退化为 ctx（通常是调用方传入的请求 ctx），
-// 最终兜底为 Background。
-func (m *manager) root(fallback context.Context) context.Context {
+func (m *Manager) root(fallback context.Context) context.Context {
 	m.mu.Lock()
 	root := m.rootCtx
 	m.mu.Unlock()
@@ -123,7 +115,7 @@ func (m *manager) root(fallback context.Context) context.Context {
 	return context.Background()
 }
 
-func (m *manager) create(ctx context.Context, urls []string) (*taskHandle, error) {
+func (m *Manager) create(ctx context.Context, urls []string) (*taskHandle, error) {
 	id, err := newTaskID()
 	if err != nil {
 		return nil, err
@@ -140,13 +132,12 @@ func (m *manager) create(ctx context.Context, urls []string) (*taskHandle, error
 		cancel()
 	}
 
-	downloader := New(WithStorage(storage.Default()))
 	toEvent := buildMonitorEvent(id)
 
 	t := task.New(
 		task.Config[taskStatus, fileStatus, *downloadv1.MonitorTaskResponse]{
 			States: taskState,
-			Work:   makeWork(downloader),
+			Work:   makeWork(m.downloader),
 			Build: func(ev task.Event[taskStatus, fileStatus]) *downloadv1.MonitorTaskResponse {
 				m.persist(id, ev)
 				return toEvent(ev)
@@ -182,14 +173,14 @@ func (m *manager) create(ctx context.Context, urls []string) (*taskHandle, error
 	return h, nil
 }
 
-func (m *manager) get(id string) (*taskHandle, bool) {
+func (m *Manager) get(id string) (*taskHandle, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	t, ok := m.tasks[id]
 	return t, ok
 }
 
-func (m *manager) remove(id string) {
+func (m *Manager) remove(id string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.tasks, id)
@@ -199,7 +190,7 @@ func (m *manager) remove(id string) {
 func (h *taskHandle) taskID() string { return h.id }
 
 // makeWork 把共享的 Downloader 包装成泛型任务要求的 WorkFunc。
-func makeWork(d Downloader) task.WorkFunc {
+func makeWork(d adapter.Downloader) task.WorkFunc {
 	return func(ctx context.Context, url string, onProgress func(task.Progress)) error {
 		if d == nil {
 			return ErrNoCamera
@@ -216,9 +207,4 @@ func newTaskID() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(b), nil
-}
-
-// momentClientCamera 从客户端单例拿到当前相机会话，供默认下载器使用。
-func momentClientCamera() (*moment.Camera, error) {
-	return client.Default().Camera()
 }

@@ -2,25 +2,29 @@ package connection
 
 import (
 	"context"
-	"errors"
 
-	"ci.zevix.uk/moment-go/config"
-	"ci.zevix.uk/moment-go/connect"
-	"ci.zevix.uk/moment-go/pool/client"
+	"ci.zevix.uk/moment-go/adapter"
+	"ci.zevix.uk/moment-go/pkg/moment"
 	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
-type connService struct {
+type Service struct {
 	connectionv1.UnimplementedCameraConnectionServiceServer
+	cameras adapter.CameraConnector
+	config  adapter.ConfigStore
 }
 
-func (connService) InitlizeCamera(ctx context.Context, req *connectionv1.InitlizeCameraRequest) (*connectionv1.InitlizeCameraResponse, error) {
-	config.SetDefault(req.Cfg)
+func New(cameras adapter.CameraConnector, config adapter.ConfigStore) *Service {
+	return &Service{cameras: cameras, config: config}
+}
+
+func (s *Service) InitlizeCamera(ctx context.Context, req *connectionv1.InitlizeCameraRequest) (*connectionv1.InitlizeCameraResponse, error) {
+	s.config.Set(req.GetCfg())
 	return nil, nil
 }
 
-func (connService) ConnectCamera(ctx context.Context, req *connectionv1.ConnectCameraRequest) (*connectionv1.ConnectCameraResponse, error) {
-	cam, err := connect.Open(ctx, req)
+func (s *Service) ConnectCamera(ctx context.Context, req *connectionv1.ConnectCameraRequest) (*connectionv1.ConnectCameraResponse, error) {
+	cam, err := s.cameras.Connect(ctx, connectOptions(req))
 	if err != nil {
 		return nil, err
 	}
@@ -31,13 +35,28 @@ func (connService) ConnectCamera(ctx context.Context, req *connectionv1.ConnectC
 	}, nil
 }
 
-func (connService) DisconnectCamera(ctx context.Context, req *connectionv1.DisconnectCameraRequest) (*connectionv1.DisconnectCameraResponse, error) {
-	cl := client.Default()
-	if cl == nil {
-		return nil, errors.New("cam has disconnect")
+func (s *Service) DisconnectCamera(ctx context.Context, req *connectionv1.DisconnectCameraRequest) (*connectionv1.DisconnectCameraResponse, error) {
+	err := s.cameras.Disconnect(ctx)
+	return &connectionv1.DisconnectCameraResponse{}, err
+}
+
+func connectOptions(req *connectionv1.ConnectCameraRequest) moment.ConnectOptions {
+	if req == nil {
+		return moment.ConnectOptions{}
 	}
 
-	err := cl.Disconnect(ctx)
-
-	return &connectionv1.DisconnectCameraResponse{}, err
+	switch req.GetMode() {
+	case connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP:
+		return moment.ConnectOptions{
+			Type: req.GetMode(),
+			Host: req.GetPortPath(),
+		}
+	case connectionv1.ConnectionMode_CONNECTION_MODE_USB:
+		return moment.ConnectOptions{
+			Type:    req.GetMode(),
+			USBPort: req.GetPortPath(),
+		}
+	default:
+		return moment.ConnectOptions{Type: req.GetMode()}
+	}
 }

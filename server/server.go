@@ -10,25 +10,32 @@ import (
 	"google.golang.org/grpc"
 )
 
-var _default = NewServer()
-
-func DefaultSrv() Server {
-	return _default
-}
-
+// Server 是 gRPC 服务器，监听地址由注入的 mnet.Net 决定。
 type Server struct {
 	*grpc.Server
+	net mnet.Net
 }
 
-func NewServer() Server {
-	return Server{
+// NewServer 创建服务器。network 为 nil 时退化为非监听模式（仅用于测试装配）。
+func NewServer(network mnet.Net) *Server {
+	return &Server{
 		Server: grpc.NewServer(),
+		net:    network,
 	}
 }
 
-func (s Server) Run(ctx context.Context) error {
-	netName := mnet.DefaultNet().Network()
-	addr := mnet.DefaultNet().Addr()
+// RegisterService 注册生成的 gRPC 服务。
+func (s *Server) RegisterService(desc *grpc.ServiceDesc, impl any) {
+	s.Server.RegisterService(desc, impl)
+}
+
+func (s *Server) Run(ctx context.Context) error {
+	if s.net == nil {
+		return errors.New("server: no network configured")
+	}
+
+	netName := s.net.Network()
+	addr := s.net.Addr()
 
 	slog.Debug("grpc server listening", "network", netName, "addr", addr)
 
@@ -52,7 +59,6 @@ func (s Server) Run(ctx context.Context) error {
 		slog.Debug("grpc server stopped", "addr", addr, "err", err)
 		return err
 	case <-ctx.Done():
-		// 根 ctx 取消（收到退出信号）：优雅停机并等待 Serve 返回。
 		slog.Debug("grpc server shutting down", "addr", addr)
 		s.GracefulStop()
 		<-errCh
@@ -71,7 +77,6 @@ func (l loggingListener) Accept() (net.Conn, error) {
 		if !errors.Is(err, net.ErrClosed) {
 			slog.Debug("grpc accept failed", "err", err)
 		}
-
 		return nil, err
 	}
 

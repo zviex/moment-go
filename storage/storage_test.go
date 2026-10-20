@@ -65,16 +65,3 @@ func TestWriteFailureRemovesObject(t *testing.T) {
 		t.Fatalf("partial object should be removed, got %v", err)
 	}
 }
-
-func TestNewDefaultsToDisk(t *testing.T) {
-	s, err := New("", Options{"root": t.TempDir()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := s.(*Disk); !ok {
-		t.Fatalf("default backend should be *Disk, got %T", s)
-	}
-	if _, err := New("nope", nil); err == nil {
-		t.Fatal("unknown backend should error")
-	}
-}

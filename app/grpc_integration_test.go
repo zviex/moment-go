@@ -19,12 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"ci.zevix.uk/moment-go/config"
-	"ci.zevix.uk/moment-go/pool/client"
-	"ci.zevix.uk/moment-go/server"
-	"ci.zevix.uk/moment-go/server/mnet"
-	"ci.zevix.uk/moment-go/service/camera"
-	"ci.zevix.uk/moment-go/service/connection"
+	"ci.zevix.uk/moment-go/box"
 	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
 	configv1 "ci.zevix.uk/moment/moment-protogo/config/v1"
 	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
@@ -43,6 +38,7 @@ const rpcTimeout = 30 * time.Second
 type harness struct {
 	addr    string
 	conn    *grpc.ClientConn
+	app     *box.Box
 	connSvc connectionv1.CameraConnectionServiceClient
 	camSvc  camerav1.CameraServiceClient
 }
@@ -54,20 +50,26 @@ func TestMain(m *testing.M) {
 }
 
 func runWithServer(m *testing.M) int {
-	// 使用独立 socket，避免与真实运行进程的 /tmp/moment_nkcon.sock 冲突。
+	// 使用独立 socket 与临时数据目录，避免与真实运行进程冲突。
 	sock := filepath.Join("/tmp", fmt.Sprintf("moment-go-test-%d.sock", os.Getpid()))
+	dataDir, err := os.MkdirTemp("", "moment-go-test-*")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "create temp dir:", err)
+		return 1
+	}
+	defer os.RemoveAll(dataDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	mnet.SetDefaultNet(mnet.NewUnixAt(sock))
-	defer func() { _ = mnet.DefaultNet().Cleanup() }()
+	app, err := box.New(ctx, box.Options{DataDir: dataDir, SocketAddr: sock})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "build box:", err)
+		return 1
+	}
+	defer app.Close()
 
-	// 仅注册 camera / connection 服务（download 与 sync 暂不测试）。
-	camera.Init()
-	connection.Init()
-
-	go func() { _ = server.DefaultSrv().Run(ctx) }()
+	go func() { _ = app.Run(ctx) }()
 
 	conn, err := dial(ctx, sock)
 	if err != nil {
@@ -76,14 +78,10 @@ func runWithServer(m *testing.M) int {
 	}
 	defer conn.Close()
 
-	// pool/client 的单例在进程初始化时被置为零值 &moment.Client{}，
-	// 其内部 app 为 nil，无法代表"尚无相机会话"。这里显式复位为 nil，
-	// 以模拟后端刚启动、尚未建立任何相机会话的初始状态。
-	client.SetDefault(nil)
-
 	testEnv = &harness{
 		addr:    sock,
 		conn:    conn,
+		app:     app,
 		connSvc: connectionv1.NewCameraConnectionServiceClient(conn),
 		camSvc:  camerav1.NewCameraServiceClient(conn),
 	}
@@ -149,9 +147,9 @@ func markDisconnected() {
 }
 
 // ensureDisconnected 确保后端未连接，供 PTP/IP 负向用例使用：
-// connect.Open 对已连接会话会直接复用，只有未连接时才会真正尝试建连。
+// moment.Client 对已连接会话会直接复用，只有未连接时才会真正尝试建连。
 func ensureDisconnected(t *testing.T) {
-	if cl := client.Default(); cl != nil && cl.IsConnected() {
+	if testEnv.app.Camera.IsConnected() {
 		if _, err := testEnv.connSvc.DisconnectCamera(context.Background(),
 			&connectionv1.DisconnectCameraRequest{}); err != nil {
 			t.Fatalf("precondition disconnect: %v", err)
@@ -187,9 +185,9 @@ func TestConnectionService(t *testing.T) {
 			t.Fatal("InitlizeCamera returned nil response")
 		}
 
-		got := config.Default()
+		got := testEnv.app.Config.Get()
 		if got == nil {
-			t.Fatal("config.Default() is nil after InitlizeCamera")
+			t.Fatal("config store returned nil after InitlizeCamera")
 		}
 		if got.GetOpPath() != cfg.GetOpPath() || got.GetNetPath() != cfg.GetNetPath() {
 			t.Fatalf("config not applied: got %+v want %+v", got, cfg)
@@ -253,17 +251,19 @@ func TestConnectionService(t *testing.T) {
 		}
 	})
 
-	t.Run("DisconnectCamera_WhenDisconnected_ReturnsError", func(t *testing.T) {
-		if client.Default() != nil && client.Default().IsConnected() {
+	t.Run("DisconnectCamera_WhenDisconnected_IsNoop", func(t *testing.T) {
+		if testEnv.app.Camera.IsConnected() {
 			t.Skip("camera connected, covered by TestDisconnectCamera lifecycle")
 		}
 
-		_, err := testEnv.connSvc.DisconnectCamera(context.Background(),
+		resp, err := testEnv.connSvc.DisconnectCamera(context.Background(),
 			&connectionv1.DisconnectCameraRequest{})
-		if err == nil {
-			t.Fatal("expected error when disconnecting without a session")
+		if err != nil {
+			t.Fatalf("disconnect without a session should be idempotent: %v", err)
 		}
-		t.Logf("expected disconnect error: %v", err)
+		if resp == nil {
+			t.Fatal("DisconnectCamera returned nil response")
+		}
 	})
 }
 
@@ -388,7 +388,7 @@ func TestDisconnectCamera(t *testing.T) {
 		t.Fatalf("DisconnectCamera: %v", err)
 	}
 
-	if cl := client.Default(); cl != nil && cl.IsConnected() {
+	if testEnv.app.Camera.IsConnected() {
 		t.Fatal("client still reports connected after DisconnectCamera")
 	}
 }

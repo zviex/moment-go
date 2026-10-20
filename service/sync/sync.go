@@ -8,15 +8,20 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type sync struct {
+type Service struct {
 	syncv1.UnimplementedAutoSyncServiceServer
+	recorder *Recorder
 }
 
-func (sync) EnableAutoSync(ctx context.Context, req *syncv1.EnableAutoSyncRequest) (*syncv1.EnableAutoSyncResponse, error) {
+func New(recorder *Recorder) *Service {
+	return &Service{recorder: recorder}
+}
+
+func (s *Service) EnableAutoSync(ctx context.Context, req *syncv1.EnableAutoSyncRequest) (*syncv1.EnableAutoSyncResponse, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, status.FromContextError(err).Err()
 	}
-	if err := defaultRecorder.Enable(); err != nil {
+	if err := s.recorder.Enable(); err != nil {
 		return nil, status.Errorf(codes.Internal, "autosync: enable: %v", err)
 	}
 

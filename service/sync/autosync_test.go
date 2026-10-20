@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"ci.zevix.uk/moment-go/adapter"
 	gktask "ci.zevix.uk/moment-go/pkg/task"
 )
 
@@ -15,14 +16,14 @@ type captureStub struct {
 }
 
 // Events 按序吐出每个 url 对应的拍摄事件。
-func (c *captureStub) Events(ctx context.Context) (<-chan CaptureEvent, error) {
-	ch := make(chan CaptureEvent)
+func (c *captureStub) Events(ctx context.Context) (<-chan adapter.CaptureEvent, error) {
+	ch := make(chan adapter.CaptureEvent)
 	go func() {
 		defer close(ch)
 
 		for _, u := range c.urls {
 			select {
-			case ch <- CaptureEvent{URL: u, At: time.Now()}:
+			case ch <- adapter.CaptureEvent{URL: u, At: time.Now()}:
 			case <-ctx.Done():
 				return
 			}
