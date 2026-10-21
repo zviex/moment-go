@@ -7,9 +7,14 @@ import (
 	"time"
 
 	"ci.zevix.uk/moment-go/adapter"
+	"ci.zevix.uk/moment-go/adapter/ports"
 	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
 )
 
+var _ ports.ConnectionManager = (*Client)(nil)
+
+// Client 是相机会话的唯一所有者：负责连接、断开与在途操作的租约管理。
+// 数据面能力由 capability.go 中的代理通过 withSession 借用当前会话。
 type Client struct {
 	connect    adapter.ConnectFunc
 	discoverer adapter.Discoverer
@@ -18,10 +23,14 @@ type Client struct {
 	// ops 串行化 Connect / Disconnect，避免生命周期竞争。
 	ops sync.Mutex
 
-	mu      sync.RWMutex
-	state   camerav1.State
-	lastErr error
-	session adapter.Session
+	mu            sync.Mutex
+	state         camerav1.State
+	lastErr       error
+	session       adapter.Session
+	sessionCtx    context.Context
+	sessionCancel context.CancelFunc
+	refs          int
+	idle          *sync.Cond
 }
 
 func NewClient(connect adapter.ConnectFunc, discoverer adapter.Discoverer, closeFn ...func() error) *Client {
@@ -30,6 +39,7 @@ func NewClient(connect adapter.ConnectFunc, discoverer adapter.Discoverer, close
 		discoverer: discoverer,
 		state:      camerav1.State_STATE_DISCONNECTED,
 	}
+	c.idle = sync.NewCond(&c.mu)
 	if len(closeFn) > 0 {
 		c.closeFn = closeFn[0]
 	}
@@ -41,8 +51,8 @@ func (c *Client) State() camerav1.State {
 	if c == nil {
 		return camerav1.State_STATE_DISCONNECTED
 	}
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.state
 }
 
@@ -54,8 +64,8 @@ func (c *Client) LastError() error {
 	if c == nil {
 		return nil
 	}
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.lastErr
 }
 
@@ -71,13 +81,14 @@ func (c *Client) Detect(ctx context.Context) ([]adapter.DetectedCamera, error) {
 }
 
 // Connect 若已连接则直接复用当前会话，不重复建立新连接。
-// 连接超时由调用方通过 context 控制。
-func (c *Client) Connect(ctx context.Context, target *camerav1.Tartget) (*Camera, error) {
+// 返回连接元信息而非会话句柄，避免调用方持有可逃逸的生命周期对象。
+func (c *Client) Connect(ctx context.Context, target *camerav1.Tartget) (ports.ConnectionInfo, error) {
+	var zero ports.ConnectionInfo
 	if c == nil || c.connect == nil {
-		return nil, ErrBackendUnavailable
+		return zero, ErrBackendUnavailable
 	}
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return zero, err
 	}
 
 	c.ops.Lock()
@@ -87,11 +98,11 @@ func (c *Client) Connect(ctx context.Context, target *camerav1.Tartget) (*Camera
 	case camerav1.State_STATE_CONNECTED:
 		sess, err := c.sessionOrErr()
 		if err != nil {
-			return nil, err
+			return zero, err
 		}
-		return &Camera{client: c, session: sess}, nil
+		return connectionInfo(sess), nil
 	case camerav1.State_STATE_CONNECTING, camerav1.State_STATE_DISCONNECTING:
-		return nil, ErrInvalidState
+		return zero, ErrInvalidState
 	}
 
 	c.setState(camerav1.State_STATE_CONNECTING)
@@ -102,29 +113,24 @@ func (c *Client) Connect(ctx context.Context, target *camerav1.Tartget) (*Camera
 	if err != nil {
 		c.fail(err)
 		slog.Error("connect failed", "err", err)
-		return nil, err
+		return zero, err
 	}
+
+	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 
 	c.mu.Lock()
 	c.session = sess
+	c.sessionCtx = sessionCtx
+	c.sessionCancel = sessionCancel
 	c.state = camerav1.State_STATE_CONNECTED
 	c.lastErr = nil
 	c.mu.Unlock()
 
 	slog.Info("connected", "model", sess.Model(), "driver", sess.Driver(), "port", sess.PortPath())
-	return &Camera{client: c, session: sess}, nil
+	return connectionInfo(sess), nil
 }
 
-// Camera 返回当前已连接会话对应的 Camera；未连接时返回 ErrNotConnected。
-func (c *Client) Camera() (*Camera, error) {
-	sess, err := c.sessionOrErr()
-	if err != nil {
-		return nil, err
-	}
-	return &Camera{client: c, session: sess}, nil
-}
-
-// Disconnect 断开连接并释放会话资源。
+// Disconnect 取消在途操作、等待租约释放并关闭底层会话。
 func (c *Client) Disconnect(ctx context.Context) error {
 	if c == nil {
 		return nil
@@ -133,17 +139,34 @@ func (c *Client) Disconnect(ctx context.Context) error {
 	c.ops.Lock()
 	defer c.ops.Unlock()
 
-	switch c.State() {
+	c.mu.Lock()
+	switch c.state {
 	case camerav1.State_STATE_CONNECTED:
-		return nil
 	case camerav1.State_STATE_CONNECTING, camerav1.State_STATE_DISCONNECTING:
+		c.mu.Unlock()
 		return ErrInvalidState
+	default:
+		c.mu.Unlock()
+		return nil
+	}
+
+	c.state = camerav1.State_STATE_DISCONNECTING
+	sess := c.session
+	cancel := c.sessionCancel
+	c.sessionCancel = nil
+	c.mu.Unlock()
+
+	// 立即取消在途操作与拍摄事件流，使它们释放租约。
+	if cancel != nil {
+		cancel()
 	}
 
 	c.mu.Lock()
-	sess := c.session
+	for c.refs > 0 {
+		c.idle.Wait()
+	}
 	c.session = nil
-	c.state = camerav1.State_STATE_DISCONNECTING
+	c.sessionCtx = nil
 	c.mu.Unlock()
 
 	var closeErr error
@@ -180,13 +203,71 @@ func (c *Client) Close() error {
 	return nil
 }
 
+// withSession 在租约内执行一次短操作。fn 收到的 ctx 会在断开时被取消。
+func (c *Client) withSession(ctx context.Context, fn func(context.Context, adapter.Session) error) error {
+	sess, sessionCtx, release, err := c.borrowSession(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
+	opCtx, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(sessionCtx, cancel)
+	defer func() {
+		stop()
+		cancel()
+	}()
+
+	if err := opCtx.Err(); err != nil {
+		return err
+	}
+	return fn(opCtx, sess)
+}
+
+// borrowSession 增加一个租约并返回当前会话。调用方必须在用完后调用 release。
+// 拍摄事件这类长生命周期能力会持有租约直到事件流结束。
+func (c *Client) borrowSession(ctx context.Context) (adapter.Session, context.Context, func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, nil, err
+	}
+	if c == nil {
+		return nil, nil, nil, ErrNotConnected
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.state != camerav1.State_STATE_CONNECTED || c.session == nil || c.sessionCtx == nil {
+		return nil, nil, nil, ErrNotConnected
+	}
+
+	c.refs++
+	sess, sessionCtx := c.session, c.sessionCtx
+	release := sync.OnceFunc(func() {
+		c.mu.Lock()
+		c.refs--
+		if c.refs == 0 {
+			c.idle.Broadcast()
+		}
+		c.mu.Unlock()
+	})
+	return sess, sessionCtx, release, nil
+}
+
 func (c *Client) sessionOrErr() (adapter.Session, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.state != camerav1.State_STATE_CONNECTED || c.session == nil {
 		return nil, ErrNotConnected
 	}
 	return c.session, nil
+}
+
+func connectionInfo(sess adapter.Session) ports.ConnectionInfo {
+	return ports.ConnectionInfo{
+		Model:    sess.Model(),
+		Driver:   sess.Driver(),
+		PortPath: sess.PortPath(),
+	}
 }
 
 func (c *Client) setState(s camerav1.State) {

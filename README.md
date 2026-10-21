@@ -20,32 +20,35 @@
 graph TD
     A[app/main] --> B[box 组合根]
     B --> C[adapter/gphoto2<br/>libgphoto2 cgo 绑定]
-    B --> D[pkg/moment<br/>Client · Camera Session]
+    B --> D[pkg/moment<br/>Client · 能力代理]
     B --> E[service/*<br/>camera · connection · download · sync]
     B --> F[server/mnet/storage/config]
-    E --> D
-    E --> G[adapter 端口]
+    E --> G[adapter/ports 窄端口]
+    D --> G
     C -. 实现 ConnectFunc / Discoverer / Session .-> D
 ```
 
 依赖方向由组合根统一装配：`box` 创建所有长生命周期实例并通过最小接口注入，
 服务与适配器不再使用 `Default()` 之类的包级单例。
 
-相机侧只保留一层抽象：`adapter/gphoto2` 的 cgo 绑定接收标准化的
-`moment.Target`（端口路径 + 模型名），并实现 `pkg/moment` 中按职责拆分的接口：
+相机侧按“控制面 / 数据面”分层：`adapter/gphoto2` 的 cgo 绑定接收标准化的
+标准化的连接目标（端口路径 + 模型名），并实现 `adapter.Session`：
 
 - `ConnectFunc`：用标准化目标建立连接
 - `Discoverer`：自动发现相机
-- `ReadOnlyFS`：列出目录 / 文件、读取文件信息与内容
-- `Session`：组合 `ReadOnlyFS` + 相机元信息 + 生命周期
+- `Session`：一次连接绑定的内部句柄，组合文件、信息、拍摄事件与生命周期
 
-“自动 / USB / PTP/IP 如何转成 `Target`”由 `adapter.TargetResolver` 抽象，
+`Session` 只在 `moment.Client` 与后端之间流转，不直接注入服务。
+服务依赖的是 `adapter/ports` 中的窄端口：`FileBrowser` / `FileReader` /
+`CameraInfo` / `CaptureSource` / `ConnectionManager` / `TargetResolver` /
+`Downloader` / `ConfigStore`。`pkg/moment` 提供绑定 `Client` 的能力代理，
+每个服务只声明自己实际使用的能力。
+
+“自动 / USB / PTP/IP 如何转成 `Target`”由 `adapter/ports.TargetResolver` 抽象，
 输入直接使用 protobuf 的 `connectionv1.ConnectOption`（oneof 载荷），
 默认实现基于 `Discoverer` 探测结果构建参数，不再混入 gphoto2 封装。
-`moment.Client` 只负责生命周期与连接复用；`moment.Camera` 是已连接会话的门面。
-服务所需的端口（`CameraSource` / `TargetResolver` / `Camera` / `Downloader` /
-`CaptureSource` / `ConfigStore`）集中定义在 `adapter/ports.go`（或 `adapter/target.go`），
-由组合根把实现注入服务，避免接口散落在各 service 包中。
+`moment.Client` 负责连接生命周期与租约：数据操作通过内部 `withSession` 借用
+当前会话；断开时立即取消在途操作、等待租约释放后关闭底层会话。
 原本的 `domain.Gateway`、`usecase` 与 `pool/client` 单例层已移除。
 
 **目录结构**
@@ -55,8 +58,9 @@ moment-go/
 ├── go.mod
 ├── app/main.go                    # 入口：创建 box 并运行 gRPC 服务
 ├── box/                           # 组合根：集中构造依赖图
-├── adapter/                       # 端口（接口）+ 后端实现
-│   ├── ports.go                   # 服务依赖的最小接口
+├── adapter/                       # 后端契约 + 端口 + 实现
+│   ├── backend.go                 # ConnectFunc / Discoverer / 内部 Session
+│   ├── ports/                     # 服务依赖的窄端口（按能力拆分）
 │   ├── target.go                  # TargetResolver（ConnectOption → 连接目标）
 │   └── gphoto2/                   # libgphoto2 后端（cgo + 无 cgo 桩）
 │       ├── bindings.go            # #cgo 指令（头文件 / 链接）
@@ -64,10 +68,9 @@ moment-go/
 │       ├── client.go              # Client（ConnectFunc / Discoverer）+ Camera Session
 │       ├── bootstrap.go           # CAMLIBS / IOLIBS 环境变量
 │       └── result.go              # 返回码 → 公共错误
-├── pkg/moment/                    # 对外 API 与最小接口
-│   ├── backend.go                 # ConnectFunc / Discoverer / ReadOnlyFS / Session
-│   ├── client.go                  # 生命周期与连接复用
-│   ├── camera.go                  # 会话门面 + ListTree / Download
+├── pkg/moment/                    # Client 生命周期与能力代理
+│   ├── client.go                  # 状态机 / 租约 / withSession
+│   ├── capability.go              # 文件、信息、拍摄事件代理
 │   └── types.go                   # 公共类型与错误
 ├── service/                       # gRPC 服务（构造期注入依赖）
 │   ├── camera/

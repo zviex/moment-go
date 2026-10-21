@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"ci.zevix.uk/moment-go/adapter"
+	"ci.zevix.uk/moment-go/adapter/ports"
 )
 
 var errNoSource = errors.New("autosync: capture source not set")
@@ -14,8 +14,8 @@ var errNoSource = errors.New("autosync: capture source not set")
 type Recorder struct {
 	rootCtx context.Context
 
-	downloader adapter.Downloader
-	source     adapter.CaptureSource
+	downloader ports.Downloader
+	source     ports.CaptureSource
 
 	// 运行态：nil = disabled；非 nil = 正在运行。
 	run atomic.Pointer[recorderRun]
@@ -25,7 +25,7 @@ type recorderRun struct {
 	cancel context.CancelFunc
 }
 
-func NewRecorder(rootCtx context.Context, source adapter.CaptureSource, downloader adapter.Downloader) *Recorder {
+func NewRecorder(rootCtx context.Context, source ports.CaptureSource, downloader ports.Downloader) *Recorder {
 	if rootCtx == nil {
 		rootCtx = context.Background()
 	}
@@ -48,7 +48,12 @@ func (r *Recorder) Enable() error {
 		return nil
 	}
 
-	go r.runLoop(ctx)
+	go func() {
+		r.runLoop(ctx)
+		// 事件流结束（连接断开或源关闭）后回到 disabled，允许重新 Enable。
+		r.run.CompareAndSwap(newRun, nil)
+		cancel()
+	}()
 
 	return nil
 }
@@ -87,7 +92,7 @@ func (r *Recorder) runLoop(ctx context.Context) {
 }
 
 // syncFile 把单个拍摄事件对应的文件同步到 Disk。
-func (r *Recorder) syncFile(parent context.Context, ev adapter.CaptureEvent) {
+func (r *Recorder) syncFile(parent context.Context, ev ports.CaptureEvent) {
 	if ev.URL == "" {
 		return
 	}

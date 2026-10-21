@@ -2,8 +2,8 @@ package adapter
 
 import (
 	"context"
-	"io"
 
+	"ci.zevix.uk/moment-go/adapter/ports"
 	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
 )
 
@@ -22,21 +22,18 @@ type Discoverer interface {
 	Detect(ctx context.Context) ([]DetectedCamera, error)
 }
 
-// ReadOnlyFS 抽象相机上的只读文件系统：
-// 列出目录、列出文件、读取文件信息与打开文件内容。
-type ReadOnlyFS interface {
-	List(ctx context.Context, folder string) ([]*camerav1.FileContent, error)
-	Open(ctx context.Context, folder, name string) (io.ReadCloser, error)
-}
-
-// Session 是已建立连接上的相机会话：只读文件系统 + 相机元信息 + 生命周期。
+// Session 是一次连接绑定的底层会话，只在 Client 与后端之间流转。
+// 服务不应依赖该接口：它们只依赖 ports 中的窄能力端口。
 type Session interface {
-	ReadOnlyFS
+	ports.FileLister
+	ports.FileStatter
+	ports.FileDownloader
+	ports.CameraInfo
+	ports.CaptureSource
 
 	Model() string
 	Driver() string
 	PortPath() string
 
-	GetInfo(ctx context.Context) (*camerav1.CameraSummary, error)
 	Close(ctx context.Context) error
 }

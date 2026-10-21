@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"ci.zevix.uk/moment-go/adapter/ports"
 	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
 	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
@@ -19,15 +20,11 @@ const (
 	ptpipCameraModel = "PTP/IP Camera"
 )
 
-type TargetResolver interface {
-	Resolve(ctx context.Context, opt *connectionv1.ConnectOption) (*camerav1.Tartget, error)
-}
-
 type resolver struct {
 	discoverer Discoverer
 }
 
-func NewTargetResolver(discoverer Discoverer) TargetResolver {
+func NewTargetResolver(discoverer Discoverer) ports.TargetResolver {
 	return &resolver{discoverer: discoverer}
 }
 

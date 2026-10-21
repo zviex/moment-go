@@ -41,6 +41,7 @@ import (
 	"unsafe"
 
 	"ci.zevix.uk/moment-go/adapter"
+	"ci.zevix.uk/moment-go/adapter/ports"
 	"ci.zevix.uk/moment-go/pkg/moment"
 	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -447,6 +448,83 @@ func (s *GP2Camera) GetFileInfo(ctx context.Context, folder, name string) (*came
 	nameC := C.CString(name)
 	defer C.free(unsafe.Pointer(nameC))
 	return s.fileInfoLocked(folderC, nameC)
+}
+
+// capturePollInterval 是等待拍摄事件时单次阻塞的上限，用于定期检查 ctx。
+const capturePollInterval = 250 * time.Millisecond
+
+// Events 订阅相机拍摄事件。连接断开或 ctx 取消时 channel 关闭。
+func (s *GP2Camera) Events(ctx context.Context) (<-chan ports.CaptureEvent, error) {
+	s.mu.Lock()
+	err := s.requireOpen()
+	s.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(chan ports.CaptureEvent, 16)
+	go func() {
+		defer close(out)
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+			ev, ok, err := s.waitEvent(ctx)
+			if err != nil {
+				slog.Debug("capture event stream stopped", "err", err)
+				return
+			}
+			if !ok {
+				continue
+			}
+			select {
+			case out <- ev:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return out, nil
+}
+
+// waitEvent 等待一个事件，超时返回 ok=false。
+func (s *GP2Camera) waitEvent(ctx context.Context) (ports.CaptureEvent, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.requireOpen(); err != nil {
+		return ports.CaptureEvent{}, false, err
+	}
+	if err := ctx.Err(); err != nil {
+		return ports.CaptureEvent{}, false, err
+	}
+
+	var eventType C.CameraEventType
+	var data unsafe.Pointer
+	if err := resultToError(int(C.gp_camera_wait_for_event(
+		s.cam,
+		C.int(capturePollInterval/time.Millisecond),
+		&eventType,
+		&data,
+		s.client.ctx,
+	))); err != nil {
+		return ports.CaptureEvent{}, false, err
+	}
+	if data != nil {
+		defer C.free(data)
+	}
+
+	if eventType != C.GP_EVENT_FILE_ADDED || data == nil {
+		return ports.CaptureEvent{}, false, nil
+	}
+
+	fp := (*C.CameraFilePath)(data)
+	folder := C.GoString(&fp.folder[0])
+	name := C.GoString(&fp.name[0])
+	return ports.CaptureEvent{
+		URL: joinFolder(folder, name),
+		At:  time.Now(),
+	}, true, nil
 }
 
 // DownloadTo 下载文件并写入 w。
