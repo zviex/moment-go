@@ -40,6 +40,7 @@ graph TD
 - `Session`：组合 `ReadOnlyFS` + 相机元信息 + 生命周期
 
 “自动 / USB / PTP/IP 如何转成 `Target`”由 `adapter.TargetResolver` 抽象，
+输入直接使用 protobuf 的 `connectionv1.ConnectOption`（oneof 载荷），
 默认实现基于 `Discoverer` 探测结果构建参数，不再混入 gphoto2 封装。
 `moment.Client` 只负责生命周期与连接复用；`moment.Camera` 是已连接会话的门面。
 服务所需的端口（`CameraSource` / `TargetResolver` / `Camera` / `Downloader` /
@@ -56,7 +57,7 @@ moment-go/
 ├── box/                           # 组合根：集中构造依赖图
 ├── adapter/                       # 端口（接口）+ 后端实现
 │   ├── ports.go                   # 服务依赖的最小接口
-│   ├── target.go                  # ConnectOptions + TargetResolver（请求 → 连接目标）
+│   ├── target.go                  # TargetResolver（ConnectOption → 连接目标）
 │   └── gphoto2/                   # libgphoto2 后端（cgo + 无 cgo 桩）
 │       ├── bindings.go            # #cgo 指令（头文件 / 链接）
 │       ├── context.go             # GPContext 生命周期
@@ -126,9 +127,11 @@ if err != nil {
 client := moment.NewClient(backend.Connect, backend, backend.Close)
 resolver := adapter.NewTargetResolver(client)
 
-target, err := resolver.Resolve(ctx, adapter.ConnectOptions{
-    Type: connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP,
-    Host: "192.168.1.100",
+target, err := resolver.Resolve(ctx, &connectionv1.ConnectOption{
+    Mode: connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP,
+    Payload: &connectionv1.ConnectOption_Ptp{
+        Ptp: &connectionv1.ConnectCameraPTP{PortPath: "192.168.1.100"},
+    },
 })
 if err != nil {
     panic(err)
@@ -150,16 +153,21 @@ fmt.Printf("folders=%d files=%d\n", len(content.Folders), len(content.Files))
 ### USB 连接
 
 ```go
-// 自动探测（取第一个 USB 相机）
-target, err := resolver.Resolve(ctx, adapter.ConnectOptions{
-	Type: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO,
+// 自动探测（取第一个相机）
+target, err := resolver.Resolve(ctx, &connectionv1.ConnectOption{
+	Mode: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO,
 })
 cam, err := client.Connect(ctx, target)
 
-// 指定端口连接
-target, err = resolver.Resolve(ctx, adapter.ConnectOptions{
-	Type:    connectionv1.ConnectionMode_CONNECTION_MODE_USB,
-	USBPort: "usb:001,002",
+// 按 USB VID/PID 选择相机（均为 0 时取第一个探测结果）
+target, err = resolver.Resolve(ctx, &connectionv1.ConnectOption{
+	Mode: connectionv1.ConnectionMode_CONNECTION_MODE_USB,
+	Payload: &connectionv1.ConnectOption_Usb{
+		Usb: &connectionv1.ConnectCameraUSB{
+			UsbVendorId:  0x04a9,
+			UsbProductId: 0x32ab,
+		},
+	},
 })
 cam, err = client.Connect(ctx, target)
 ```
@@ -275,8 +283,7 @@ IOLIBS   = <root>/libgphoto2_port/<版本>/   # ptpip.so、usb1.so 等端口驱�
   （路径前缀 `^ptpip:`，正则匹配器）。
 - 适配层以 `gp_port_info_list_lookup_path("ptpip:<host>[:<port>]")` 匹配该端口，
   并把实际路径写回端口信息，供 ptp2 驱动解析主机地址。
-- 相机模型取能力表中的 `"PTP/IP Camera"`（可通过 `adapter.ConnectOptions.Model` 覆盖，
-  例如索尼相机的 `"Sony:ILCE-7M5 (MTP mode)"`）。
+- 相机模型固定取能力表中的 `"PTP/IP Camera"`。
 
 ## 验证
 

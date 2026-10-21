@@ -49,8 +49,10 @@ type Target struct {
 
 // DetectedCamera 是自动探测到的一台相机。
 type DetectedCamera struct {
-	Model    string // 相机模型名
-	PortPath string // 端口路径，如 "usb:001,002"
+	Model        string // 相机模型名
+	PortPath     string // 端口路径，如 "usb:001,002"
+	USBVendorID  uint32 // USB Vendor ID（非 USB 设备或未知时为 0）
+	USBProductID uint32 // USB Product ID（非 USB 设备或未知时为 0）
 }
 
 // Folder 表示相机文件系统中的一个目录。

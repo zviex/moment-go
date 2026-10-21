@@ -3,7 +3,7 @@ module ci.zevix.uk/moment-go
 go 1.26.8
 
 require (
-	ci.zevix.uk/moment/moment-protogo v0.0.0-20260927140440-75130cada129
+	ci.zevix.uk/moment/moment-protogo v0.0.0-20261021055141-eb9467658020
 	github.com/uptrace/bun v1.3.0
 	github.com/uptrace/bun/dialect/sqlitedialect v1.3.0
 	github.com/uptrace/bun/driver/sqliteshim v1.3.0

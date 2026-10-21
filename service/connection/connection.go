@@ -26,7 +26,7 @@ func (s *Service) InitlizeCamera(ctx context.Context, req *connectionv1.Initlize
 }
 
 func (s *Service) ConnectCamera(ctx context.Context, req *connectionv1.ConnectCameraRequest) (*connectionv1.ConnectCameraResponse, error) {
-	target, err := s.resolver.Resolve(ctx, connectOptions(req))
+	target, err := s.resolver.Resolve(ctx, req.GetOpt())
 	if err != nil {
 		return nil, err
 	}
@@ -45,25 +45,4 @@ func (s *Service) ConnectCamera(ctx context.Context, req *connectionv1.ConnectCa
 func (s *Service) DisconnectCamera(ctx context.Context, req *connectionv1.DisconnectCameraRequest) (*connectionv1.DisconnectCameraResponse, error) {
 	err := s.cameras.Disconnect(ctx)
 	return &connectionv1.DisconnectCameraResponse{}, err
-}
-
-func connectOptions(req *connectionv1.ConnectCameraRequest) adapter.ConnectOptions {
-	if req == nil {
-		return adapter.ConnectOptions{}
-	}
-
-	switch req.GetMode() {
-	case connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP:
-		return adapter.ConnectOptions{
-			Type: req.GetMode(),
-			Host: req.GetPortPath(),
-		}
-	case connectionv1.ConnectionMode_CONNECTION_MODE_USB:
-		return adapter.ConnectOptions{
-			Type:    req.GetMode(),
-			USBPort: req.GetPortPath(),
-		}
-	default:
-		return adapter.ConnectOptions{Type: req.GetMode()}
-	}
 }

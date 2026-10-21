@@ -19,112 +19,88 @@ const (
 	ptpipCameraModel = "PTP/IP Camera"
 )
 
-// ConnectOptions 是应用层发起连接时的请求参数，描述“想怎么连”，
-// 而不是后端实际使用的端口 / 模型。它由 TargetResolver 归一化为 moment.Target。
-type ConnectOptions struct {
-	// Type 连接方式：CONNECTION_MODE_AUTO / USB / PTPIP，
-	// 留空（UNSPECIFIED）等同自动探测。
-	Type connectionv1.ConnectionMode
-	// Model 相机模型名；PTP/IP 缺省为 "PTP/IP Camera"。
-	Model string
-	// Host PTP/IP 主机地址，可带端口或 "ptpip:" 前缀。
-	Host string
-	// Port PTP/IP 端口，0 表示使用 Host 中的端口或默认 15740。
-	Port int
-	// USBPort USB 端口路径（形如 "usb:001,002"）。
-	USBPort string
-}
-
-// TargetResolver 负责把应用层的连接请求转换为后端可用的标准化连接目标。
-// 不同连接方式（自动 / USB / PTP/IP）的参数构建逻辑都收敛在实现中。
 type TargetResolver interface {
-	Resolve(ctx context.Context, opts ConnectOptions) (moment.Target, error)
+	Resolve(ctx context.Context, opt *connectionv1.ConnectOption) (moment.Target, error)
 }
 
 type resolver struct {
 	discoverer moment.Discoverer
 }
 
-// NewTargetResolver 创建基于相机探测的默认解析器。
 func NewTargetResolver(discoverer moment.Discoverer) TargetResolver {
 	return &resolver{discoverer: discoverer}
 }
 
-// Resolve 把连接选项归一化为 (端口路径, 模型名)。
-func (r *resolver) Resolve(ctx context.Context, opts ConnectOptions) (moment.Target, error) {
+func (r *resolver) Resolve(ctx context.Context, opt *connectionv1.ConnectOption) (moment.Target, error) {
 	if err := ctx.Err(); err != nil {
 		return moment.Target{}, err
 	}
 
-	switch opts.Type {
+	mode := opt.GetMode()
+	if mode == connectionv1.ConnectionMode_CONNECTION_MODE_UNSPECIFIED {
+		switch {
+		case opt.GetPtp() != nil:
+			mode = connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP
+		case opt.GetUsb() != nil:
+			mode = connectionv1.ConnectionMode_CONNECTION_MODE_USB
+		}
+	}
+
+	switch mode {
 	case connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP:
-		return resolvePTPIP(opts)
+		return resolvePTPIP(opt)
 	case connectionv1.ConnectionMode_CONNECTION_MODE_USB:
-		return r.resolveUSB(ctx, opts)
+		return r.resolveUSB(ctx, opt)
 	default: // CONNECTION_MODE_AUTO / UNSPECIFIED：自动探测第一个相机
 		return r.firstDetected(ctx)
 	}
 }
 
-func resolvePTPIP(opts ConnectOptions) (moment.Target, error) {
-	addr, existingPort, err := splitHostPort(strings.TrimSpace(opts.Host))
+func resolvePTPIP(opt *connectionv1.ConnectOption) (moment.Target, error) {
+	ptp := opt.GetPtp()
+	if ptp == nil {
+		return moment.Target{}, errors.New("ptpip connect requires ptp payload")
+	}
+	addr, existingPort, err := splitHostPort(ptp.GetPortPath())
 	if err != nil {
 		return moment.Target{}, err
 	}
-	port := opts.Port
-	if port <= 0 {
-		port = existingPort
-	}
+	port := existingPort
 	if port <= 0 {
 		port = defaultPTPIPPort
 	}
-	model := strings.TrimSpace(opts.Model)
-	if model == "" {
-		model = ptpipCameraModel
-	}
 	target := moment.Target{
 		PortPath: fmt.Sprintf("ptpip:%s:%d", addr, port),
-		Model:    model,
+		Model:    ptpipCameraModel,
 	}
 	slog.Debug("ptp/ip target resolved", "host", addr, "port", port, "port_path", target.PortPath)
 	return target, nil
 }
 
-func (r *resolver) resolveUSB(ctx context.Context, opts ConnectOptions) (moment.Target, error) {
-	portPath := strings.TrimSpace(opts.USBPort)
-	model := strings.TrimSpace(opts.Model)
-	if portPath == "" {
-		// 未指定端口时，用模型（或第一个）匹配探测结果。
-		cams, err := r.detect(ctx)
-		if err != nil {
-			return moment.Target{}, err
-		}
-		if len(cams) == 0 {
-			return moment.Target{}, errors.New("no camera detected")
-		}
-		for _, c := range cams {
-			if model == "" || c.Model == model {
-				return moment.Target{PortPath: c.PortPath, Model: c.Model}, nil
-			}
-		}
-		return moment.Target{}, fmt.Errorf("camera model %q not detected", model)
+func (r *resolver) resolveUSB(ctx context.Context, opt *connectionv1.ConnectOption) (moment.Target, error) {
+	usb := opt.GetUsb()
+	if usb == nil || (usb.GetUsbVendorId() == 0 && usb.GetUsbProductId() == 0) {
+		// 未指定 USB 设备标识时，取第一个探测到的相机。
+		return r.firstDetected(ctx)
 	}
-	if model == "" {
-		cams, err := r.detect(ctx)
-		if err != nil {
-			return moment.Target{}, err
-		}
-		for _, c := range cams {
-			if c.PortPath == portPath {
-				model = c.Model
-				break
-			}
-		}
-		if model == "" {
-			return moment.Target{}, fmt.Errorf("no detected camera on port %q", portPath)
-		}
+
+	cams, err := r.detect(ctx)
+	if err != nil {
+		return moment.Target{}, err
 	}
-	return moment.Target{PortPath: portPath, Model: model}, nil
+	for _, c := range cams {
+		if usb.GetUsbVendorId() != 0 && c.USBVendorID != usb.GetUsbVendorId() {
+			continue
+		}
+		if usb.GetUsbProductId() != 0 && c.USBProductID != usb.GetUsbProductId() {
+			continue
+		}
+		return moment.Target{PortPath: c.PortPath, Model: c.Model}, nil
+	}
+	return moment.Target{}, fmt.Errorf(
+		"usb camera %04x:%04x not detected",
+		usb.GetUsbVendorId(), usb.GetUsbProductId(),
+	)
 }
 
 func (r *resolver) firstDetected(ctx context.Context) (moment.Target, error) {

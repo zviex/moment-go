@@ -120,7 +120,9 @@ func connectUSB(t *testing.T, ctx context.Context) bool {
 	defer cancel()
 
 	resp, err := testEnv.connSvc.ConnectCamera(rpcCtx, &connectionv1.ConnectCameraRequest{
-		Mode: connectionv1.ConnectionMode_CONNECTION_MODE_USB,
+		Opt: &connectionv1.ConnectOption{
+			Mode: connectionv1.ConnectionMode_CONNECTION_MODE_USB,
+		},
 	})
 	if err != nil {
 		t.Skipf("camera unavailable, skip: %v", err)
@@ -164,8 +166,12 @@ func connectPTPIP(ctx context.Context, host string) (*connectionv1.ConnectCamera
 	defer cancel()
 
 	return testEnv.connSvc.ConnectCamera(rpcCtx, &connectionv1.ConnectCameraRequest{
-		Mode:     connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP,
-		PortPath: host,
+		Opt: &connectionv1.ConnectOption{
+			Mode: connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP,
+			Payload: &connectionv1.ConnectOption_Ptp{
+				Ptp: &connectionv1.ConnectCameraPTP{PortPath: host},
+			},
+		},
 	})
 }
 

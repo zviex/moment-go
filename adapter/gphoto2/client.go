@@ -129,10 +129,19 @@ func (g *Client) Detect(ctx context.Context) ([]moment.DetectedCamera, error) {
 		if C.gp_list_get_value(list, C.int(i), &value) != 0 {
 			continue
 		}
-		cams = append(cams, moment.DetectedCamera{
+		cam := moment.DetectedCamera{
 			Model:    C.GoString(name),
 			PortPath: C.GoString(value),
-		})
+		}
+		// 能力表中记录了每个模型的 USB VID/PID，用于按设备标识精确选择相机。
+		if idx := int(C.gp_abilities_list_lookup_model(al, name)); idx >= 0 {
+			var ab C.CameraAbilities
+			if C.gp_abilities_list_get_abilities(al, C.int(idx), &ab) == 0 {
+				cam.USBVendorID = uint32(ab.usb_vendor)
+				cam.USBProductID = uint32(ab.usb_product)
+			}
+		}
+		cams = append(cams, cam)
 	}
 	return cams, nil
 }
