@@ -5,16 +5,19 @@ import (
 	"context"
 	"io"
 	"testing"
+
+	"ci.zevix.uk/moment-go/adapter"
+	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
 )
 
 // fakeBackend 提供标准化 Connect 与 Discoverer，用于无硬件测试。
 type fakeBackend struct{}
 
-func (fakeBackend) Detect(context.Context) ([]DetectedCamera, error) {
-	return []DetectedCamera{{Model: "TestCam", PortPath: "usb:001,002"}}, nil
+func (fakeBackend) Detect(context.Context) ([]adapter.DetectedCamera, error) {
+	return []adapter.DetectedCamera{{Model: "TestCam", PortPath: "usb:001,002"}}, nil
 }
 
-func (fakeBackend) Connect(ctx context.Context, _ Target) (Session, error) {
+func (fakeBackend) Connect(ctx context.Context, _ *camerav1.Tartget) (adapter.Session, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -25,7 +28,7 @@ func (fakeBackend) Connect(ctx context.Context, _ Target) (Session, error) {
 
 type fakeSession struct {
 	tree  map[string][]string
-	files map[string][]File
+	files map[string][]*camerav1.FileEntry
 }
 
 func fakeTree() map[string][]string {
@@ -37,8 +40,8 @@ func fakeTree() map[string][]string {
 	}
 }
 
-func fakeFiles() map[string][]File {
-	return map[string][]File{
+func fakeFiles() map[string][]*camerav1.FileEntry {
+	return map[string][]*camerav1.FileEntry{
 		"/store_00010001/DCIM/100CANON": {
 			{Name: "IMG_0001.JPG", Size: 2048, MimeType: "image/jpeg"},
 			{Name: "IMG_0002.JPG", Size: 4096, MimeType: "image/jpeg"},
@@ -50,43 +53,27 @@ func (s *fakeSession) Model() string    { return "TestCam" }
 func (s *fakeSession) Driver() string   { return "fake" }
 func (s *fakeSession) PortPath() string { return "usb:001,002" }
 
-func (s *fakeSession) ListFolders(_ context.Context, folder string) ([]Folder, error) {
-	names, ok := s.tree[folder]
-	if !ok {
-		return nil, ErrDirectoryNotFound
-	}
-	out := make([]Folder, 0, len(names))
-	for _, n := range names {
-		p := "/" + n
-		if folder != "/" {
-			p = folder + "/" + n
-		}
-		out = append(out, Folder{Name: n, Path: p})
-	}
-	return out, nil
-}
-
-func (s *fakeSession) ListFiles(_ context.Context, folder string) ([]File, error) {
+func (s *fakeSession) ListFiles(_ context.Context, folder string) ([]*camerav1.FileEntry, error) {
 	if _, ok := s.tree[folder]; !ok {
 		if _, ok := s.files[folder]; !ok {
 			return nil, ErrDirectoryNotFound
 		}
 	}
-	out := make([]File, 0, len(s.files[folder]))
+	out := make([]*camerav1.FileEntry, 0, len(s.files[folder]))
 	for _, f := range s.files[folder] {
-		f.Folder = folder
+		f.Floder = folder
 		out = append(out, f)
 	}
 	return out, nil
 }
 
-func (s *fakeSession) GetFileInfo(_ context.Context, folder, name string) (File, error) {
+func (s *fakeSession) GetFileInfo(_ context.Context, folder, name string) (*camerav1.FileEntry, error) {
 	for _, f := range s.files[folder] {
 		if f.Name == name {
 			return f, nil
 		}
 	}
-	return File{}, ErrFileNotFound
+	return nil, ErrFileNotFound
 }
 
 func (s *fakeSession) Open(_ context.Context, folder, name string) (io.ReadCloser, error) {
@@ -97,11 +84,15 @@ func (s *fakeSession) Open(_ context.Context, folder, name string) (io.ReadClose
 	return io.NopCloser(bytes.NewReader(bytes.Repeat([]byte("x"), int(f.Size)))), nil
 }
 
-func (s *fakeSession) GetInfo(context.Context) (CameraInfo, error) {
-	return CameraInfo{Model: "TestCam", Driver: "fake", PortPath: "usb:001,002"}, nil
+func (s *fakeSession) GetInfo(context.Context) (*camerav1.CameraSummary, error) {
+	return &camerav1.CameraSummary{Model: "TestCam", Driver: "fake", PortPath: "usb:001,002"}, nil
 }
 
 func (s *fakeSession) Close(context.Context) error { return nil }
+
+func (s *fakeSession) List(ctx context.Context, folder string) ([]*camerav1.FileContent, error) {
+	return nil, nil
+}
 
 func newTestClient() *Client {
 	b := fakeBackend{}
@@ -112,7 +103,7 @@ func TestConnectLifecycle(t *testing.T) {
 	c := newTestClient()
 	ctx := context.Background()
 
-	cam, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
+	cam, err := c.Connect(ctx, &camerav1.Tartget{PortPath: "usb:001,002", Model: "TestCam"})
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
@@ -120,7 +111,7 @@ func TestConnectLifecycle(t *testing.T) {
 		t.Fatal("expected connected camera")
 	}
 
-	same, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
+	same, err := c.Connect(ctx, &camerav1.Tartget{PortPath: "usb:001,002", Model: "TestCam"})
 	if err != nil {
 		t.Fatalf("second connect should reuse session: %v", err)
 	}
@@ -147,31 +138,10 @@ func TestOperationsRequireConnection(t *testing.T) {
 	}
 }
 
-func TestListTreeWalksAllFolders(t *testing.T) {
-	c := newTestClient()
-	ctx := context.Background()
-	cam, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cam.Close(ctx)
-
-	content, err := cam.ListTree(ctx)
-	if err != nil {
-		t.Fatalf("ListTree: %v", err)
-	}
-	if len(content.Folders) != 4 {
-		t.Fatalf("folders = %d, want 4", len(content.Folders))
-	}
-	if len(content.Files) != 2 {
-		t.Fatalf("files = %d, want 2", len(content.Files))
-	}
-}
-
 func TestDownloadRoundTrip(t *testing.T) {
 	c := newTestClient()
 	ctx := context.Background()
-	cam, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
+	cam, err := c.Connect(ctx, &camerav1.Tartget{PortPath: "usb:001,002", Model: "TestCam"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +167,7 @@ func TestDownloadRoundTrip(t *testing.T) {
 func TestGetInfo(t *testing.T) {
 	c := newTestClient()
 	ctx := context.Background()
-	cam, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
+	cam, err := c.Connect(ctx, &camerav1.Tartget{PortPath: "usb:001,002", Model: "TestCam"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +186,7 @@ func TestConnectCanceledContext(t *testing.T) {
 	c := newTestClient()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
+	_, err := c.Connect(ctx, &camerav1.Tartget{PortPath: "usb:001,002", Model: "TestCam"})
 	if err == nil {
 		t.Fatal("expected canceled context error")
 	}

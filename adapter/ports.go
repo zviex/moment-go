@@ -5,14 +5,13 @@ import (
 	"io"
 	"time"
 
-	"ci.zevix.uk/moment-go/pkg/moment"
 	"ci.zevix.uk/moment-go/pkg/task"
 	configv1 "ci.zevix.uk/moment/moment-protogo/config/v1"
 )
 
 // CameraSource 提供当前已连接的相机会话。
 type CameraSource interface {
-	Camera() (*moment.Camera, error)
+	Camera() (Session, error)
 }
 
 // ConfigStore 保存运行期配置。
@@ -22,7 +21,8 @@ type ConfigStore interface {
 
 // Camera 是下载流程真正需要的相机能力。
 type Camera interface {
-	GetFileInfo(ctx context.Context, folder, name string) (moment.File, error)
+	Session
+	GetFileInfo()
 	DownloadTo(ctx context.Context, folder, name string, w io.Writer) error
 }
 

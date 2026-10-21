@@ -4,16 +4,15 @@ import (
 	"context"
 	"testing"
 
-	"ci.zevix.uk/moment-go/pkg/moment"
 	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
 type fakeDiscoverer struct {
-	cams []moment.DetectedCamera
+	cams []DetectedCamera
 	err  error
 }
 
-func (f fakeDiscoverer) Detect(context.Context) ([]moment.DetectedCamera, error) {
+func (f fakeDiscoverer) Detect(context.Context) ([]DetectedCamera, error) {
 	return f.cams, f.err
 }
 
@@ -104,7 +103,7 @@ func TestResolvePTPIPRequiresHost(t *testing.T) {
 }
 
 func TestResolveUSBByIDs(t *testing.T) {
-	r := NewTargetResolver(fakeDiscoverer{cams: []moment.DetectedCamera{
+	r := NewTargetResolver(fakeDiscoverer{cams: []DetectedCamera{
 		{Model: "CamA", PortPath: "usb:001,002", USBVendorID: 0x1111, USBProductID: 0x2222},
 		{Model: "CamB", PortPath: "usb:001,003", USBVendorID: 0x3333, USBProductID: 0x4444},
 	}})
@@ -118,7 +117,7 @@ func TestResolveUSBByIDs(t *testing.T) {
 }
 
 func TestResolveUSBUnknownIDs(t *testing.T) {
-	r := NewTargetResolver(fakeDiscoverer{cams: []moment.DetectedCamera{
+	r := NewTargetResolver(fakeDiscoverer{cams: []DetectedCamera{
 		{Model: "CamA", PortPath: "usb:001,002", USBVendorID: 0x1111, USBProductID: 0x2222},
 	}})
 	if _, err := r.Resolve(context.Background(), usbOption(0x9999, 0x8888)); err == nil {
@@ -127,7 +126,7 @@ func TestResolveUSBUnknownIDs(t *testing.T) {
 }
 
 func TestResolveUSBWithoutIDsUsesFirstDetected(t *testing.T) {
-	r := NewTargetResolver(fakeDiscoverer{cams: []moment.DetectedCamera{
+	r := NewTargetResolver(fakeDiscoverer{cams: []DetectedCamera{
 		{Model: "CamA", PortPath: "usb:001,002", USBVendorID: 0x1111, USBProductID: 0x2222},
 	}})
 	target, err := r.Resolve(context.Background(), usbOption(0, 0))
@@ -153,7 +152,7 @@ func TestResolveInfersModeFromPayload(t *testing.T) {
 }
 
 func TestResolveAutoFirstDetected(t *testing.T) {
-	r := NewTargetResolver(fakeDiscoverer{cams: []moment.DetectedCamera{
+	r := NewTargetResolver(fakeDiscoverer{cams: []DetectedCamera{
 		{Model: "CamA", PortPath: "usb:001,002"},
 		{Model: "CamB", PortPath: "usb:001,003"},
 	}})

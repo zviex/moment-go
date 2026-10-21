@@ -40,7 +40,10 @@ import (
 	"time"
 	"unsafe"
 
+	"ci.zevix.uk/moment-go/adapter"
 	"ci.zevix.uk/moment-go/pkg/moment"
+	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // 文件信息字段位掩码（gphoto2-filesys.h）。
@@ -87,7 +90,7 @@ func (g *GP2Client) Close() error {
 }
 
 // Detect 加载端口与能力列表，探测可用相机（USB），并附上所有可用端口。
-func (g *GP2Client) Detect(ctx context.Context) ([]moment.DetectedCamera, error) {
+func (g *GP2Client) Detect(ctx context.Context) ([]adapter.DetectedCamera, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -120,7 +123,7 @@ func (g *GP2Client) Detect(ctx context.Context) ([]moment.DetectedCamera, error)
 	}
 
 	n := int(C.gp_list_count(list))
-	cams := make([]moment.DetectedCamera, 0, n)
+	cams := make([]adapter.DetectedCamera, 0, n)
 	for i := 0; i < n; i++ {
 		var name, value *C.char
 		if C.gp_list_get_name(list, C.int(i), &name) != 0 {
@@ -129,7 +132,7 @@ func (g *GP2Client) Detect(ctx context.Context) ([]moment.DetectedCamera, error)
 		if C.gp_list_get_value(list, C.int(i), &value) != 0 {
 			continue
 		}
-		cam := moment.DetectedCamera{
+		cam := adapter.DetectedCamera{
 			Model:    C.GoString(name),
 			PortPath: C.GoString(value),
 		}
@@ -148,7 +151,7 @@ func (g *GP2Client) Detect(ctx context.Context) ([]moment.DetectedCamera, error)
 
 // Connect 用标准化目标（端口路径 + 模型名）建立相机连接。
 // 如何从用户请求推导 Target 由调用方的 TargetResolver 负责。
-func (g *GP2Client) Connect(ctx context.Context, target moment.Target) (moment.Session, error) {
+func (g *GP2Client) Connect(ctx context.Context, target *camerav1.Tartget) (adapter.Session, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -291,106 +294,13 @@ func (s *GP2Camera) requireOpen() error {
 	return nil
 }
 
-// ListFolders 列出目录下的子目录。
-func (s *GP2Camera) ListFolders(ctx context.Context, folder string) ([]moment.Folder, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if err := s.requireOpen(); err != nil {
-		return nil, err
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	folderC := C.CString(folder)
-	defer C.free(unsafe.Pointer(folderC))
-
-	var list *C.CameraList
-	if err := resultToError(int(C.gp_list_new(&list))); err != nil {
-		return nil, err
-	}
-	defer C.gp_list_free(list)
-
-	if err := resultToError(int(C.gp_camera_folder_list_folders(s.cam, folderC, list, s.client.ctx))); err != nil {
-		return nil, err
-	}
-	n := int(C.gp_list_count(list))
-	out := make([]moment.Folder, 0, n)
-	for i := 0; i < n; i++ {
-		var name *C.char
-		if C.gp_list_get_name(list, C.int(i), &name) != 0 {
-			continue
-		}
-		fname := C.GoString(name)
-		out = append(out, moment.Folder{Name: fname, Path: joinFolder(folder, fname)})
-	}
-	return out, nil
-}
-
-// ListFiles 列出目录下的文件（含文件信息）。
-func (s *GP2Camera) ListFiles(ctx context.Context, folder string) ([]moment.File, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if err := s.requireOpen(); err != nil {
-		return nil, err
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	folderC := C.CString(folder)
-	defer C.free(unsafe.Pointer(folderC))
-
-	var list *C.CameraList
-	if err := resultToError(int(C.gp_list_new(&list))); err != nil {
-		return nil, err
-	}
-	defer C.gp_list_free(list)
-
-	if err := resultToError(int(C.gp_camera_folder_list_files(s.cam, folderC, list, s.client.ctx))); err != nil {
-		return nil, err
-	}
-	n := int(C.gp_list_count(list))
-	out := make([]moment.File, 0, n)
-	for i := 0; i < n; i++ {
-		var name *C.char
-		if C.gp_list_get_name(list, C.int(i), &name) != 0 {
-			continue
-		}
-		fname := C.GoString(name)
-		f := moment.File{Name: fname, Folder: folder}
-		if fi, err := s.fileInfoLocked(folderC, name); err == nil {
-			f = fi
-			f.Name = fname
-			f.Folder = folder
-		}
-		out = append(out, f)
-	}
-	return out, nil
-}
-
-// GetFileInfo 查询单个文件信息。
-func (s *GP2Camera) GetFileInfo(ctx context.Context, folder, name string) (moment.File, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if err := s.requireOpen(); err != nil {
-		return moment.File{}, err
-	}
-	if err := ctx.Err(); err != nil {
-		return moment.File{}, err
-	}
-	folderC := C.CString(folder)
-	defer C.free(unsafe.Pointer(folderC))
-	nameC := C.CString(name)
-	defer C.free(unsafe.Pointer(nameC))
-	return s.fileInfoLocked(folderC, nameC)
-}
-
 // fileInfoLocked 调用 gp_camera_file_get_info 组装文件信息（需已持有锁）。
-func (s *GP2Camera) fileInfoLocked(folderC, nameC *C.char) (moment.File, error) {
+func (s *GP2Camera) fileInfoLocked(folderC, nameC *C.char) (*camerav1.FileEntry, error) {
 	var ci C.CameraFileInfo
 	if err := resultToError(int(C.gp_camera_file_get_info(s.cam, folderC, nameC, &ci, s.client.ctx))); err != nil {
-		return moment.File{}, err
+		return nil, err
 	}
-	f := moment.File{Name: C.GoString(nameC), Folder: C.GoString(folderC)}
+	f := &camerav1.FileEntry{Name: C.GoString(nameC), Floder: C.GoString(folderC)}
 	fileFields := int(ci.file.fields)
 	if fileFields&gpFileInfoSize != 0 {
 		f.Size = int64(ci.file.size)
@@ -401,20 +311,20 @@ func (s *GP2Camera) fileInfoLocked(folderC, nameC *C.char) (moment.File, error) 
 		f.MimeType = C.GoString(&mimeBuf[0])
 	}
 	if fileFields&gpFileInfoWidth != 0 {
-		f.Width = int(ci.file.width)
+		f.Width = int32(ci.file.width)
 	}
 	if fileFields&gpFileInfoHeight != 0 {
-		f.Height = int(ci.file.height)
+		f.Height = int32(ci.file.height)
 	}
 	if fileFields&gpFileInfoStatus != 0 {
 		f.Downloaded = int(ci.file.status) == 1 // GP_FILE_STATUS_DOWNLOADED
 	}
 	if fileFields&gpFileInfoPermissions != 0 {
-		f.Permissions = int(ci.file.permissions)
+		f.Permissions = int32(ci.file.permissions)
 	}
 	if fileFields&gpFileInfoMtime != 0 {
 		if mt := int64(ci.file.mtime); mt > 0 {
-			f.MTime = time.Unix(mt, 0)
+			f.Mtime = timestamppb.New(time.Unix(int64(ci.file.mtime), 0))
 		}
 	}
 	return f, nil
@@ -465,6 +375,22 @@ func (s *GP2Camera) Open(ctx context.Context, folder, name string) (io.ReadClose
 	return io.NopCloser(bytes.NewReader(data)), nil
 }
 
+func (s *GP2Camera) GetFileInfo(ctx context.Context, folder, name string) (*camerav1.FileEntry, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.requireOpen(); err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	folderC := C.CString(folder)
+	defer C.free(unsafe.Pointer(folderC))
+	nameC := C.CString(name)
+	defer C.free(unsafe.Pointer(nameC))
+	return s.fileInfoLocked(folderC, nameC)
+}
+
 // DownloadTo 下载文件并写入 w。
 func (s *GP2Camera) DownloadTo(ctx context.Context, folder, name string, w io.Writer) error {
 	data, err := s.Download(ctx, folder, name)
@@ -476,17 +402,17 @@ func (s *GP2Camera) DownloadTo(ctx context.Context, folder, name string, w io.Wr
 }
 
 // GetInfo 聚合相机信息。
-func (s *GP2Camera) GetInfo(ctx context.Context) (moment.CameraInfo, error) {
+func (s *GP2Camera) GetInfo(ctx context.Context) (*camerav1.CameraSummary, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.requireOpen(); err != nil {
-		return moment.CameraInfo{}, err
+		return nil, err
 	}
 	if err := ctx.Err(); err != nil {
-		return moment.CameraInfo{}, err
+		return nil, err
 	}
 
-	info := moment.CameraInfo{
+	info := &camerav1.CameraSummary{
 		Model:    s.model,
 		Driver:   s.driver,
 		PortPath: s.portPath,
@@ -513,7 +439,7 @@ func (s *GP2Camera) GetInfo(ctx context.Context) (moment.CameraInfo, error) {
 
 	// 配置树。
 	if cfg, err := s.configLocked(); err == nil {
-		info.Config = cfg
+		info.Config = cfg.String()
 	} else if !errors.Is(err, moment.ErrUnsupported) {
 		slog.Debug("config tree", "err", err)
 	}
@@ -522,7 +448,7 @@ func (s *GP2Camera) GetInfo(ctx context.Context) (moment.CameraInfo, error) {
 }
 
 // storageInfoLocked 读取存储信息（需已持有锁）。
-func (s *GP2Camera) storageInfoLocked() ([]moment.StorageInfo, error) {
+func (s *GP2Camera) storageInfoLocked() ([]*camerav1.StorageInfo, error) {
 	var arr *C.CameraStorageInformation
 	var n C.int
 	if err := resultToError(int(C.gp_camera_get_storageinfo(s.cam, &arr, &n, s.client.ctx))); err != nil {
@@ -535,22 +461,22 @@ func (s *GP2Camera) storageInfoLocked() ([]moment.StorageInfo, error) {
 
 	// C 返回的是连续数组，转换为 Go 可索引的数组指针。
 	elems := (*[1 << 30]C.CameraStorageInformation)(unsafe.Pointer(arr))[:n:n]
-	out := make([]moment.StorageInfo, 0, n)
+	out := make([]*camerav1.StorageInfo, 0, n)
 	for _, e := range elems {
-		st := moment.StorageInfo{
-			BaseDir:     C.GoString(&e.basedir[0]),
+		st := &camerav1.StorageInfo{
+			Basedir:     C.GoString(&e.basedir[0]),
 			Label:       C.GoString(&e.label[0]),
 			Description: C.GoString(&e.description[0]),
 		}
 		fields := int(e.fields)
 		if fields&(1<<6) != 0 {
-			st.CapacityKB = int64(e.capacitykbytes)
+			st.CapacityKbytes = uint64(e.capacitykbytes)
 		}
 		if fields&(1<<7) != 0 {
-			st.FreeKB = int64(e.freekbytes)
+			st.FreeKbytes = uint64(e.freekbytes)
 		}
 		if fields&(1<<8) != 0 {
-			st.FreeImages = int64(e.freeimages)
+			st.FreeImages = uint64(e.freeimages)
 		}
 		out = append(out, st)
 	}

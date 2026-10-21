@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"ci.zevix.uk/moment-go/pkg/moment"
+	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
 	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
@@ -20,20 +20,20 @@ const (
 )
 
 type TargetResolver interface {
-	Resolve(ctx context.Context, opt *connectionv1.ConnectOption) (moment.Target, error)
+	Resolve(ctx context.Context, opt *connectionv1.ConnectOption) (*camerav1.Tartget, error)
 }
 
 type resolver struct {
-	discoverer moment.Discoverer
+	discoverer Discoverer
 }
 
-func NewTargetResolver(discoverer moment.Discoverer) TargetResolver {
+func NewTargetResolver(discoverer Discoverer) TargetResolver {
 	return &resolver{discoverer: discoverer}
 }
 
-func (r *resolver) Resolve(ctx context.Context, opt *connectionv1.ConnectOption) (moment.Target, error) {
+func (r *resolver) Resolve(ctx context.Context, opt *connectionv1.ConnectOption) (*camerav1.Tartget, error) {
 	if err := ctx.Err(); err != nil {
-		return moment.Target{}, err
+		return nil, err
 	}
 
 	mode := opt.GetMode()
@@ -56,20 +56,20 @@ func (r *resolver) Resolve(ctx context.Context, opt *connectionv1.ConnectOption)
 	}
 }
 
-func resolvePTPIP(opt *connectionv1.ConnectOption) (moment.Target, error) {
+func resolvePTPIP(opt *connectionv1.ConnectOption) (*camerav1.Tartget, error) {
 	ptp := opt.GetPtp()
 	if ptp == nil {
-		return moment.Target{}, errors.New("ptpip connect requires ptp payload")
+		return nil, errors.New("ptpip connect requires ptp payload")
 	}
 	addr, existingPort, err := splitHostPort(ptp.GetPortPath())
 	if err != nil {
-		return moment.Target{}, err
+		return nil, err
 	}
 	port := existingPort
 	if port <= 0 {
 		port = defaultPTPIPPort
 	}
-	target := moment.Target{
+	target := &camerav1.Tartget{
 		PortPath: fmt.Sprintf("ptpip:%s:%d", addr, port),
 		Model:    ptpipCameraModel,
 	}
@@ -77,7 +77,7 @@ func resolvePTPIP(opt *connectionv1.ConnectOption) (moment.Target, error) {
 	return target, nil
 }
 
-func (r *resolver) resolveUSB(ctx context.Context, opt *connectionv1.ConnectOption) (moment.Target, error) {
+func (r *resolver) resolveUSB(ctx context.Context, opt *connectionv1.ConnectOption) (*camerav1.Tartget, error) {
 	usb := opt.GetUsb()
 	if usb == nil || (usb.GetUsbVendorId() == 0 && usb.GetUsbProductId() == 0) {
 		// 未指定 USB 设备标识时，取第一个探测到的相机。
@@ -86,7 +86,7 @@ func (r *resolver) resolveUSB(ctx context.Context, opt *connectionv1.ConnectOpti
 
 	cams, err := r.detect(ctx)
 	if err != nil {
-		return moment.Target{}, err
+		return nil, err
 	}
 	for _, c := range cams {
 		if usb.GetUsbVendorId() != 0 && c.USBVendorID != usb.GetUsbVendorId() {
@@ -95,26 +95,26 @@ func (r *resolver) resolveUSB(ctx context.Context, opt *connectionv1.ConnectOpti
 		if usb.GetUsbProductId() != 0 && c.USBProductID != usb.GetUsbProductId() {
 			continue
 		}
-		return moment.Target{PortPath: c.PortPath, Model: c.Model}, nil
+		return &camerav1.Tartget{PortPath: c.PortPath, Model: c.Model}, nil
 	}
-	return moment.Target{}, fmt.Errorf(
+	return nil, fmt.Errorf(
 		"usb camera %04x:%04x not detected",
 		usb.GetUsbVendorId(), usb.GetUsbProductId(),
 	)
 }
 
-func (r *resolver) firstDetected(ctx context.Context) (moment.Target, error) {
+func (r *resolver) firstDetected(ctx context.Context) (*camerav1.Tartget, error) {
 	cams, err := r.detect(ctx)
 	if err != nil {
-		return moment.Target{}, err
+		return nil, err
 	}
 	if len(cams) == 0 {
-		return moment.Target{}, errors.New("no camera detected")
+		return nil, errors.New("no camera detected")
 	}
-	return moment.Target{PortPath: cams[0].PortPath, Model: cams[0].Model}, nil
+	return &camerav1.Tartget{PortPath: cams[0].PortPath, Model: cams[0].Model}, nil
 }
 
-func (r *resolver) detect(ctx context.Context) ([]moment.DetectedCamera, error) {
+func (r *resolver) detect(ctx context.Context) ([]DetectedCamera, error) {
 	if r.discoverer == nil {
 		return nil, errors.New("camera discovery is unavailable")
 	}

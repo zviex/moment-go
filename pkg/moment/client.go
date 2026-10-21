@@ -5,27 +5,30 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"ci.zevix.uk/moment-go/adapter"
+	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
 )
 
 type Client struct {
-	connect    ConnectFunc
-	discoverer Discoverer
+	connect    adapter.ConnectFunc
+	discoverer adapter.Discoverer
 	closeFn    func() error
 
 	// ops 串行化 Connect / Disconnect，避免生命周期竞争。
 	ops sync.Mutex
 
 	mu      sync.RWMutex
-	state   State
+	state   camerav1.State
 	lastErr error
-	session Session
+	session adapter.Session
 }
 
-func NewClient(connect ConnectFunc, discoverer Discoverer, closeFn ...func() error) *Client {
+func NewClient(connect adapter.ConnectFunc, discoverer adapter.Discoverer, closeFn ...func() error) *Client {
 	c := &Client{
 		connect:    connect,
 		discoverer: discoverer,
-		state:      StateDisconnected,
+		state:      camerav1.State_STATE_DISCONNECTED,
 	}
 	if len(closeFn) > 0 {
 		c.closeFn = closeFn[0]
@@ -34,9 +37,9 @@ func NewClient(connect ConnectFunc, discoverer Discoverer, closeFn ...func() err
 }
 
 // State 返回当前生命周期状态。
-func (c *Client) State() State {
+func (c *Client) State() camerav1.State {
 	if c == nil {
-		return StateDisconnected
+		return camerav1.State_STATE_DISCONNECTED
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -44,7 +47,7 @@ func (c *Client) State() State {
 }
 
 // IsConnected 是否已连接。
-func (c *Client) IsConnected() bool { return c.State() == StateConnected }
+func (c *Client) IsConnected() bool { return c.State() == camerav1.State_STATE_CONNECTED }
 
 // LastError 返回最近一次失败原因。
 func (c *Client) LastError() error {
@@ -57,7 +60,7 @@ func (c *Client) LastError() error {
 }
 
 // Detect 探测可用相机（USB 自动检测）。
-func (c *Client) Detect(ctx context.Context) ([]DetectedCamera, error) {
+func (c *Client) Detect(ctx context.Context) ([]adapter.DetectedCamera, error) {
 	if c == nil || c.discoverer == nil {
 		return nil, ErrBackendUnavailable
 	}
@@ -69,7 +72,7 @@ func (c *Client) Detect(ctx context.Context) ([]DetectedCamera, error) {
 
 // Connect 若已连接则直接复用当前会话，不重复建立新连接。
 // 连接超时由调用方通过 context 控制。
-func (c *Client) Connect(ctx context.Context, target Target) (*Camera, error) {
+func (c *Client) Connect(ctx context.Context, target *camerav1.Tartget) (*Camera, error) {
 	if c == nil || c.connect == nil {
 		return nil, ErrBackendUnavailable
 	}
@@ -81,17 +84,17 @@ func (c *Client) Connect(ctx context.Context, target Target) (*Camera, error) {
 	defer c.ops.Unlock()
 
 	switch c.State() {
-	case StateConnected:
+	case camerav1.State_STATE_CONNECTED:
 		sess, err := c.sessionOrErr()
 		if err != nil {
 			return nil, err
 		}
 		return &Camera{client: c, session: sess}, nil
-	case StateConnecting, StateDisconnecting:
+	case camerav1.State_STATE_CONNECTING, camerav1.State_STATE_DISCONNECTING:
 		return nil, ErrInvalidState
 	}
 
-	c.setState(StateConnecting)
+	c.setState(camerav1.State_STATE_CONNECTING)
 
 	slog.Info("connecting camera", "port_path", target.PortPath, "model", target.Model)
 
@@ -104,7 +107,7 @@ func (c *Client) Connect(ctx context.Context, target Target) (*Camera, error) {
 
 	c.mu.Lock()
 	c.session = sess
-	c.state = StateConnected
+	c.state = camerav1.State_STATE_CONNECTED
 	c.lastErr = nil
 	c.mu.Unlock()
 
@@ -131,16 +134,16 @@ func (c *Client) Disconnect(ctx context.Context) error {
 	defer c.ops.Unlock()
 
 	switch c.State() {
-	case StateDisconnected:
+	case camerav1.State_STATE_CONNECTED:
 		return nil
-	case StateConnecting, StateDisconnecting:
+	case camerav1.State_STATE_CONNECTING, camerav1.State_STATE_DISCONNECTING:
 		return ErrInvalidState
 	}
 
 	c.mu.Lock()
 	sess := c.session
 	c.session = nil
-	c.state = StateDisconnecting
+	c.state = camerav1.State_STATE_DISCONNECTING
 	c.mu.Unlock()
 
 	var closeErr error
@@ -149,7 +152,7 @@ func (c *Client) Disconnect(ctx context.Context) error {
 	}
 
 	c.mu.Lock()
-	c.state = StateDisconnected
+	c.state = camerav1.State_STATE_DISCONNECTED
 	c.lastErr = closeErr
 	c.mu.Unlock()
 
@@ -177,16 +180,16 @@ func (c *Client) Close() error {
 	return nil
 }
 
-func (c *Client) sessionOrErr() (Session, error) {
+func (c *Client) sessionOrErr() (adapter.Session, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	if c.state != StateConnected || c.session == nil {
+	if c.state != camerav1.State_STATE_CONNECTED || c.session == nil {
 		return nil, ErrNotConnected
 	}
 	return c.session, nil
 }
 
-func (c *Client) setState(s State) {
+func (c *Client) setState(s camerav1.State) {
 	c.mu.Lock()
 	c.state = s
 	c.mu.Unlock()
@@ -194,7 +197,7 @@ func (c *Client) setState(s State) {
 
 func (c *Client) fail(err error) {
 	c.mu.Lock()
-	c.state = StateDisconnected
+	c.state = camerav1.State_STATE_DISCONNECTED
 	c.lastErr = err
 	c.mu.Unlock()
 }
