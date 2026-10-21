@@ -294,6 +294,64 @@ func (s *GP2Camera) requireOpen() error {
 	return nil
 }
 
+// List 列出指定目录下的直接子目录与文件（非递归）。根目录为 "/"。
+// Folders 为子目录的绝对路径，Files 为文件及其元信息。
+func (s *GP2Camera) List(ctx context.Context, folder string) ([]*camerav1.FileContent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.requireOpen(); err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	folderC := C.CString(folder)
+	defer C.free(unsafe.Pointer(folderC))
+
+	var list *C.CameraList
+	if err := resultToError(int(C.gp_list_new(&list))); err != nil {
+		return nil, err
+	}
+	defer C.gp_list_free(list)
+
+	if err := resultToError(int(C.gp_camera_folder_list_folders(s.cam, folderC, list, s.client.ctx))); err != nil {
+		return nil, err
+	}
+	folderCount := int(C.gp_list_count(list))
+	content := &camerav1.FileContent{Folders: make([]string, 0, folderCount)}
+	for i := 0; i < folderCount; i++ {
+		var name *C.char
+		if C.gp_list_get_name(list, C.int(i), &name) != 0 || name == nil {
+			continue
+		}
+		content.Folders = append(content.Folders, joinFolder(folder, C.GoString(name)))
+	}
+
+	// 复用同一个列表列举文件前先清空。
+	if err := resultToError(int(C.gp_list_reset(list))); err != nil {
+		return nil, err
+	}
+	if err := resultToError(int(C.gp_camera_folder_list_files(s.cam, folderC, list, s.client.ctx))); err != nil {
+		return nil, err
+	}
+	fileCount := int(C.gp_list_count(list))
+	content.Files = make([]*camerav1.FileEntry, 0, fileCount)
+	for i := 0; i < fileCount; i++ {
+		var name *C.char
+		if C.gp_list_get_name(list, C.int(i), &name) != 0 || name == nil {
+			continue
+		}
+		entry, err := s.fileInfoLocked(folderC, name)
+		if err != nil {
+			// 部分驱动不提供完整文件信息，退化为仅含名称与目录的条目。
+			entry = &camerav1.FileEntry{Name: C.GoString(name), Floder: folder}
+		}
+		content.Files = append(content.Files, entry)
+	}
+
+	return []*camerav1.FileContent{content}, nil
+}
+
 // fileInfoLocked 调用 gp_camera_file_get_info 组装文件信息（需已持有锁）。
 func (s *GP2Camera) fileInfoLocked(folderC, nameC *C.char) (*camerav1.FileEntry, error) {
 	var ci C.CameraFileInfo
