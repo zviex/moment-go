@@ -10,12 +10,14 @@ import (
 
 type Service struct {
 	connectionv1.UnimplementedCameraConnectionServiceServer
-	cameras adapter.CameraConnector
-	config  adapter.ConfigStore
+
+	cameras  *moment.Client
+	resolver adapter.TargetResolver
+	config   adapter.ConfigStore
 }
 
-func New(cameras adapter.CameraConnector, config adapter.ConfigStore) *Service {
-	return &Service{cameras: cameras, config: config}
+func New(cameras *moment.Client, resolver adapter.TargetResolver, config adapter.ConfigStore) *Service {
+	return &Service{cameras: cameras, resolver: resolver, config: config}
 }
 
 func (s *Service) InitlizeCamera(ctx context.Context, req *connectionv1.InitlizeCameraRequest) (*connectionv1.InitlizeCameraResponse, error) {
@@ -24,7 +26,12 @@ func (s *Service) InitlizeCamera(ctx context.Context, req *connectionv1.Initlize
 }
 
 func (s *Service) ConnectCamera(ctx context.Context, req *connectionv1.ConnectCameraRequest) (*connectionv1.ConnectCameraResponse, error) {
-	cam, err := s.cameras.Connect(ctx, connectOptions(req))
+	target, err := s.resolver.Resolve(ctx, connectOptions(req))
+	if err != nil {
+		return nil, err
+	}
+
+	cam, err := s.cameras.Connect(ctx, target)
 	if err != nil {
 		return nil, err
 	}
@@ -40,23 +47,23 @@ func (s *Service) DisconnectCamera(ctx context.Context, req *connectionv1.Discon
 	return &connectionv1.DisconnectCameraResponse{}, err
 }
 
-func connectOptions(req *connectionv1.ConnectCameraRequest) moment.ConnectOptions {
+func connectOptions(req *connectionv1.ConnectCameraRequest) adapter.ConnectOptions {
 	if req == nil {
-		return moment.ConnectOptions{}
+		return adapter.ConnectOptions{}
 	}
 
 	switch req.GetMode() {
 	case connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP:
-		return moment.ConnectOptions{
+		return adapter.ConnectOptions{
 			Type: req.GetMode(),
 			Host: req.GetPortPath(),
 		}
 	case connectionv1.ConnectionMode_CONNECTION_MODE_USB:
-		return moment.ConnectOptions{
+		return adapter.ConnectOptions{
 			Type:    req.GetMode(),
 			USBPort: req.GetPortPath(),
 		}
 	default:
-		return moment.ConnectOptions{Type: req.GetMode()}
+		return adapter.ConnectOptions{Type: req.GetMode()}
 	}
 }

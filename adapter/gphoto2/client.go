@@ -41,7 +41,6 @@ import (
 	"unsafe"
 
 	"ci.zevix.uk/moment-go/pkg/moment"
-	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
 // 文件信息字段位掩码（gphoto2-filesys.h）。
@@ -61,13 +60,7 @@ const (
 	gpFilePermDelete = 1 << 1
 )
 
-// defaultPTPIPPort 是 PTP/IP 默认端口。
-const defaultPTPIPPort = 15740
-
-// ptpipCameraModel 是能力表中 PTP/IP 相机的标准模型名。
-const ptpipCameraModel = "PTP/IP Camera"
-
-// Client 是 libgphoto2 后端，实现 moment.Connector 与 moment.Discoverer。
+// Client 是 libgphoto2 后端，提供标准化 Connect 与 Detect。
 // 与平台无关：Linux / macOS 使用系统安装的 libgphoto2，Android 使用随包 .so。
 type Client struct {
 	ctx *C.GPContext
@@ -144,23 +137,14 @@ func (g *Client) Detect(ctx context.Context) ([]moment.DetectedCamera, error) {
 	return cams, nil
 }
 
-// Connect 按选项建立相机连接，支持：
-//   - CONNECTION_MODE_AUTO: 自动探测相机（取第一个）
-//   - CONNECTION_MODE_USB:  指定 USB 端口，或按模型匹配探测结果
-//   - CONNECTION_MODE_PTPIP: PTP/IP 网络连接（默认模型 "PTP/IP Camera"）
-func (g *Client) Connect(ctx context.Context, opts moment.ConnectOptions) (moment.Session, error) {
+// Connect 用标准化目标（端口路径 + 模型名）建立相机连接。
+// 如何从用户请求推导 Target 由调用方的 TargetResolver 负责。
+func (g *Client) Connect(ctx context.Context, target moment.Target) (moment.Session, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	portPath, model, err := g.resolveTarget(ctx, opts)
-	if err != nil {
-		return nil, err
-	}
-	slog.Debug("resolved camera target",
-		"mode", opts.Type,
-		"port_path", portPath,
-		"model", model,
-	)
+	portPath, model := target.PortPath, target.Model
+	slog.Debug("connecting camera target", "port_path", portPath, "model", model)
 
 	// 1. 加载端口信息列表并定位端口。
 	// 端口信息由列表持有，需保证列表在 gp_camera_init 之前一直存活。
@@ -211,77 +195,6 @@ func (g *Client) Connect(ctx context.Context, opts moment.ConnectOptions) (momen
 		driver:   driver,
 		portPath: portPath,
 	}, nil
-}
-
-// resolveTarget 把连接选项归一化为 (端口路径, 模型名)。
-func (g *Client) resolveTarget(ctx context.Context, opts moment.ConnectOptions) (string, string, error) {
-	switch opts.Type {
-	case connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP:
-		addr, existingPort, err := splitHostPort(strings.TrimSpace(opts.Host))
-		if err != nil {
-			return "", "", err
-		}
-		port := opts.Port
-		if port <= 0 {
-			port = existingPort
-		}
-		if port <= 0 {
-			port = defaultPTPIPPort
-		}
-		portPath := fmt.Sprintf("ptpip:%s:%d", addr, port)
-		model := strings.TrimSpace(opts.Model)
-		if model == "" {
-			model = ptpipCameraModel
-		}
-		slog.Debug("ptp/ip target resolved", "host", addr, "port", port, "port_path", portPath)
-		return portPath, model, nil
-
-	case connectionv1.ConnectionMode_CONNECTION_MODE_USB:
-		portPath := strings.TrimSpace(opts.USBPort)
-		model := strings.TrimSpace(opts.Model)
-		if portPath == "" {
-			// 未指定端口时，用模型（或第一个）匹配探测结果。
-			cams, err := g.Detect(ctx)
-			if err != nil {
-				return "", "", err
-			}
-			if len(cams) == 0 {
-				return "", "", errors.New("no camera detected")
-			}
-			for _, c := range cams {
-				if model == "" || c.Model == model {
-					return c.PortPath, c.Model, nil
-				}
-			}
-			return "", "", fmt.Errorf("camera model %q not detected", model)
-		}
-		if model == "" {
-			cams, err := g.Detect(ctx)
-			if err != nil {
-				return "", "", err
-			}
-			for _, c := range cams {
-				if c.PortPath == portPath {
-					model = c.Model
-					break
-				}
-			}
-			if model == "" {
-				return "", "", fmt.Errorf("no detected camera on port %q", portPath)
-			}
-		}
-		return portPath, model, nil
-
-	default: // CONNECTION_MODE_AUTO / UNSPECIFIED：自动探测第一个相机
-		cams, err := g.Detect(ctx)
-		if err != nil {
-			return "", "", err
-		}
-		if len(cams) == 0 {
-			return "", "", errors.New("no camera detected")
-		}
-		return cams[0].PortPath, cams[0].Model, nil
-	}
 }
 
 // lookupPort 在端口列表中定位指定路径的端口。

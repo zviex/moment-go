@@ -37,7 +37,7 @@ func (g *Client) Detect(ctx context.Context) ([]moment.DetectedCamera, error) {
 }
 
 // Connect 在无 cgo 构建下不可用。
-func (g *Client) Connect(_ context.Context, _ moment.ConnectOptions) (moment.Session, error) {
+func (g *Client) Connect(_ context.Context, _ moment.Target) (moment.Session, error) {
 	slog.Warn("libgphoto2 backend unavailable: rebuild with CGO_ENABLED=1")
 	return nil, moment.ErrBackendUnavailable
 }

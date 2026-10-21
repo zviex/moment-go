@@ -15,12 +15,6 @@ type CameraSource interface {
 	Camera() (*moment.Camera, error)
 }
 
-// CameraConnector 提供连接、断开能力。
-type CameraConnector interface {
-	Connect(ctx context.Context, opts moment.ConnectOptions) (*moment.Camera, error)
-	Disconnect(ctx context.Context) error
-}
-
 // ConfigStore 保存运行期配置。
 type ConfigStore interface {
 	Set(cfg *configv1.Config)

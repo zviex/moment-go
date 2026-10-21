@@ -5,7 +5,6 @@ import (
 	"time"
 
 	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
-	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
 var (
@@ -39,19 +38,13 @@ var (
 // IsBackendUnavailable 判断错误是否为“当前构建不含 libgphoto2 后端”。
 func IsBackendUnavailable(err error) bool { return errors.Is(err, ErrBackendUnavailable) }
 
-// ConnectOptions 是建立相机连接所需的最小参数集。
-type ConnectOptions struct {
-	// Type 连接方式：CONNECTION_MODE_AUTO / USB / PTPIP，
-	// 留空（UNSPECIFIED）等同自动探测。
-	Type connectionv1.ConnectionMode
-	// Model 相机模型名；PTP/IP 缺省为 "PTP/IP Camera"。
-	Model string
-	Host  string
-	// Port PTP/IP 端口，0 表示默认 15740。
-	Port int
-	// USBPort USB 端口路径（形如 "usb:001,002"）。
-	USBPort string
-	Timeout time.Duration
+// Target 是后端建立连接所需的标准化目标：
+// 端口路径决定走 USB 还是 PTP/IP，模型名决定使用哪个 camlib。
+// 如何从用户请求（自动 / USB / PTP/IP）推导出 Target 由调用方决定，
+// 后端不再感知连接方式。
+type Target struct {
+	PortPath string // 端口路径，如 "usb:001,002" 或 "ptpip:192.168.1.100:15740"
+	Model    string // 相机模型名，如 "PTP/IP Camera"
 }
 
 // DetectedCamera 是自动探测到的一台相机。

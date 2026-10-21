@@ -8,8 +8,9 @@ import (
 )
 
 type Client struct {
-	connector  Connector
+	connect    ConnectFunc
 	discoverer Discoverer
+	closeFn    func() error
 
 	// ops 串行化 Connect / Disconnect，避免生命周期竞争。
 	ops sync.Mutex
@@ -20,12 +21,16 @@ type Client struct {
 	session Session
 }
 
-func NewClient(connector Connector, discoverer Discoverer) *Client {
-	return &Client{
-		connector:  connector,
+func NewClient(connect ConnectFunc, discoverer Discoverer, closeFn ...func() error) *Client {
+	c := &Client{
+		connect:    connect,
 		discoverer: discoverer,
 		state:      StateDisconnected,
 	}
+	if len(closeFn) > 0 {
+		c.closeFn = closeFn[0]
+	}
+	return c
 }
 
 // State 返回当前生命周期状态。
@@ -62,11 +67,14 @@ func (c *Client) Detect(ctx context.Context) ([]DetectedCamera, error) {
 	return c.discoverer.Detect(ctx)
 }
 
-// Connect 建立相机连接，成功时返回当前 *Camera。
-// 若已连接则直接复用当前会话，不重复建立新连接。
-func (c *Client) Connect(ctx context.Context, opts ConnectOptions) (*Camera, error) {
-	if c == nil || c.connector == nil {
+// Connect 若已连接则直接复用当前会话，不重复建立新连接。
+// 连接超时由调用方通过 context 控制。
+func (c *Client) Connect(ctx context.Context, target Target) (*Camera, error) {
+	if c == nil || c.connect == nil {
 		return nil, ErrBackendUnavailable
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	c.ops.Lock()
@@ -85,16 +93,9 @@ func (c *Client) Connect(ctx context.Context, opts ConnectOptions) (*Camera, err
 
 	c.setState(StateConnecting)
 
-	if opts.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
-		defer cancel()
-	}
+	slog.Info("connecting camera", "port_path", target.PortPath, "model", target.Model)
 
-	slog.Info("connecting camera",
-		"type", opts.Type, "model", opts.Model, "host", opts.Host, "port", opts.Port)
-
-	sess, err := c.connector.Connect(ctx, opts)
+	sess, err := c.connect(ctx, target)
 	if err != nil {
 		c.fail(err)
 		slog.Error("connect failed", "err", err)
@@ -170,8 +171,8 @@ func (c *Client) Close() error {
 
 	_ = c.Disconnect(ctx)
 
-	if closer, ok := c.connector.(interface{ Close() error }); ok {
-		return closer.Close()
+	if c.closeFn != nil {
+		return c.closeFn()
 	}
 	return nil
 }

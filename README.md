@@ -25,24 +25,26 @@ graph TD
     B --> F[server/mnet/storage/config]
     E --> D
     E --> G[adapter 端口]
-    C -. 实现 Connector / Discoverer / Session .-> D
+    C -. 实现 ConnectFunc / Discoverer / Session .-> D
 ```
 
 依赖方向由组合根统一装配：`box` 创建所有长生命周期实例并通过最小接口注入，
 服务与适配器不再使用 `Default()` 之类的包级单例。
 
-相机侧只保留一层抽象：`adapter/gphoto2` 的 cgo 绑定直接实现
-`pkg/moment` 中按职责拆分的接口：
+相机侧只保留一层抽象：`adapter/gphoto2` 的 cgo 绑定接收标准化的
+`moment.Target`（端口路径 + 模型名），并实现 `pkg/moment` 中按职责拆分的接口：
 
-- `Connector`：建立连接
+- `ConnectFunc`：用标准化目标建立连接
 - `Discoverer`：自动发现相机
 - `ReadOnlyFS`：列出目录 / 文件、读取文件信息与内容
 - `Session`：组合 `ReadOnlyFS` + 相机元信息 + 生命周期
 
+“自动 / USB / PTP/IP 如何转成 `Target`”由 `adapter.TargetResolver` 抽象，
+默认实现基于 `Discoverer` 探测结果构建参数，不再混入 gphoto2 封装。
 `moment.Client` 只负责生命周期与连接复用；`moment.Camera` 是已连接会话的门面。
-服务所需的端口（`CameraSource` / `CameraConnector` / `Camera` / `Downloader` /
-`CaptureSource` / `ConfigStore`）集中定义在 `adapter/ports.go`，由组合根把实现注入服务，
-避免接口散落在各 service 包中。
+服务所需的端口（`CameraSource` / `TargetResolver` / `Camera` / `Downloader` /
+`CaptureSource` / `ConfigStore`）集中定义在 `adapter/ports.go`（或 `adapter/target.go`），
+由组合根把实现注入服务，避免接口散落在各 service 包中。
 原本的 `domain.Gateway`、`usecase` 与 `pool/client` 单例层已移除。
 
 **目录结构**
@@ -54,14 +56,15 @@ moment-go/
 ├── box/                           # 组合根：集中构造依赖图
 ├── adapter/                       # 端口（接口）+ 后端实现
 │   ├── ports.go                   # 服务依赖的最小接口
+│   ├── target.go                  # ConnectOptions + TargetResolver（请求 → 连接目标）
 │   └── gphoto2/                   # libgphoto2 后端（cgo + 无 cgo 桩）
 │       ├── bindings.go            # #cgo 指令（头文件 / 链接）
 │       ├── context.go             # GPContext 生命周期
-│       ├── client.go              # Client（Connector / Discoverer）+ Camera Session
+│       ├── client.go              # Client（ConnectFunc / Discoverer）+ Camera Session
 │       ├── bootstrap.go           # CAMLIBS / IOLIBS 环境变量
 │       └── result.go              # 返回码 → 公共错误
 ├── pkg/moment/                    # 对外 API 与最小接口
-│   ├── backend.go                 # Connector / Discoverer / ReadOnlyFS / Session
+│   ├── backend.go                 # ConnectFunc / Discoverer / ReadOnlyFS / Session
 │   ├── client.go                  # 生命周期与连接复用
 │   ├── camera.go                  # 会话门面 + ListTree / Download
 │   └── types.go                   # 公共类型与错误
@@ -120,12 +123,18 @@ if err != nil {
     panic(err)
 }
 
-client := moment.NewClient(backend, backend)
+client := moment.NewClient(backend.Connect, backend, backend.Close)
+resolver := adapter.NewTargetResolver(client)
 
-cam, err := client.Connect(ctx, moment.ConnectOptions{
+target, err := resolver.Resolve(ctx, adapter.ConnectOptions{
     Type: connectionv1.ConnectionMode_CONNECTION_MODE_PTPIP,
     Host: "192.168.1.100",
 })
+if err != nil {
+    panic(err)
+}
+
+cam, err := client.Connect(ctx, target)
 if err != nil {
     panic(err)
 }
@@ -142,15 +151,17 @@ fmt.Printf("folders=%d files=%d\n", len(content.Folders), len(content.Files))
 
 ```go
 // 自动探测（取第一个 USB 相机）
-cam, err := client.Connect(ctx, moment.ConnectOptions{
+target, err := resolver.Resolve(ctx, adapter.ConnectOptions{
 	Type: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO,
 })
+cam, err := client.Connect(ctx, target)
 
 // 指定端口连接
-cam, err := client.Connect(ctx, moment.ConnectOptions{
+target, err = resolver.Resolve(ctx, adapter.ConnectOptions{
 	Type:    connectionv1.ConnectionMode_CONNECTION_MODE_USB,
 	USBPort: "usb:001,002",
 })
+cam, err = client.Connect(ctx, target)
 ```
 
 ### 错误分类
@@ -264,7 +275,7 @@ IOLIBS   = <root>/libgphoto2_port/<版本>/   # ptpip.so、usb1.so 等端口驱�
   （路径前缀 `^ptpip:`，正则匹配器）。
 - 适配层以 `gp_port_info_list_lookup_path("ptpip:<host>[:<port>]")` 匹配该端口，
   并把实际路径写回端口信息，供 ptp2 驱动解析主机地址。
-- 相机模型取能力表中的 `"PTP/IP Camera"`（可通过 `ConnectOptions.Model` 覆盖，
+- 相机模型取能力表中的 `"PTP/IP Camera"`（可通过 `adapter.ConnectOptions.Model` 覆盖，
   例如索尼相机的 `"Sony:ILCE-7M5 (MTP mode)"`）。
 
 ## 验证

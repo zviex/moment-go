@@ -15,6 +15,7 @@ var _ downloadv1.DownloadServiceServer = &Service{}
 // Service 实现 download.v1.DownloadService。
 type Service struct {
 	downloadv1.UnimplementedDownloadServiceServer
+
 	manager *Manager
 }
 

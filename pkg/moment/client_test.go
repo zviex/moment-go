@@ -5,19 +5,16 @@ import (
 	"context"
 	"io"
 	"testing"
-	"time"
-
-	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
-// fakeBackend 同时实现 Connector 与 Discoverer，用于无硬件测试。
+// fakeBackend 提供标准化 Connect 与 Discoverer，用于无硬件测试。
 type fakeBackend struct{}
 
 func (fakeBackend) Detect(context.Context) ([]DetectedCamera, error) {
 	return []DetectedCamera{{Model: "TestCam", PortPath: "usb:001,002"}}, nil
 }
 
-func (fakeBackend) Connect(ctx context.Context, _ ConnectOptions) (Session, error) {
+func (fakeBackend) Connect(ctx context.Context, _ Target) (Session, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -108,14 +105,14 @@ func (s *fakeSession) Close(context.Context) error { return nil }
 
 func newTestClient() *Client {
 	b := fakeBackend{}
-	return NewClient(b, b)
+	return NewClient(b.Connect, b)
 }
 
 func TestConnectLifecycle(t *testing.T) {
 	c := newTestClient()
 	ctx := context.Background()
 
-	cam, err := c.Connect(ctx, ConnectOptions{Type: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO})
+	cam, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
@@ -123,7 +120,7 @@ func TestConnectLifecycle(t *testing.T) {
 		t.Fatal("expected connected camera")
 	}
 
-	same, err := c.Connect(ctx, ConnectOptions{Type: connectionv1.ConnectionMode_CONNECTION_MODE_AUTO})
+	same, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
 	if err != nil {
 		t.Fatalf("second connect should reuse session: %v", err)
 	}
@@ -153,7 +150,7 @@ func TestOperationsRequireConnection(t *testing.T) {
 func TestListTreeWalksAllFolders(t *testing.T) {
 	c := newTestClient()
 	ctx := context.Background()
-	cam, err := c.Connect(ctx, ConnectOptions{})
+	cam, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +171,7 @@ func TestListTreeWalksAllFolders(t *testing.T) {
 func TestDownloadRoundTrip(t *testing.T) {
 	c := newTestClient()
 	ctx := context.Background()
-	cam, err := c.Connect(ctx, ConnectOptions{})
+	cam, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +197,7 @@ func TestDownloadRoundTrip(t *testing.T) {
 func TestGetInfo(t *testing.T) {
 	c := newTestClient()
 	ctx := context.Background()
-	cam, err := c.Connect(ctx, ConnectOptions{})
+	cam, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,12 +212,12 @@ func TestGetInfo(t *testing.T) {
 	}
 }
 
-func TestConnectTimeout(t *testing.T) {
+func TestConnectCanceledContext(t *testing.T) {
 	c := newTestClient()
-	ctx := context.Background()
-	opts := ConnectOptions{Timeout: time.Nanosecond}
-	_, err := c.Connect(ctx, opts)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
 	if err == nil {
-		t.Fatal("expected timeout/cancel error")
+		t.Fatal("expected canceled context error")
 	}
 }

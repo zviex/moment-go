@@ -10,6 +10,7 @@ import (
 
 type Service struct {
 	camerav1.UnimplementedCameraServiceServer
+
 	cameras adapter.CameraSource
 }
 

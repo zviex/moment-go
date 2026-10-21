@@ -10,6 +10,7 @@ import (
 
 type Service struct {
 	syncv1.UnimplementedAutoSyncServiceServer
+
 	recorder *Recorder
 }
 

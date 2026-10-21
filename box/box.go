@@ -68,7 +68,8 @@ func New(ctx context.Context, opts Options) (*Box, error) {
 		return nil, fmt.Errorf("box: create gphoto2 backend: %w", err)
 	}
 
-	clients := moment.NewClient(backend, backend)
+	clients := moment.NewClient(backend.Connect, backend, backend.Close)
+	resolver := adapter.NewTargetResolver(clients)
 
 	disk := storage.NewDisk(opts.DataDir)
 
@@ -94,7 +95,7 @@ func New(ctx context.Context, opts Options) (*Box, error) {
 	srv := server.NewServer(network)
 
 	camerav1.RegisterCameraServiceServer(srv, camera.New(clients))
-	connectionv1.RegisterCameraConnectionServiceServer(srv, connection.New(clients, cfg))
+	connectionv1.RegisterCameraConnectionServiceServer(srv, connection.New(clients, resolver, cfg))
 	downloadv1.RegisterDownloadServiceServer(srv, download.New(manager))
 	syncv1.RegisterAutoSyncServiceServer(srv, sync.New(recorder))
 

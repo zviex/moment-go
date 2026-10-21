@@ -5,9 +5,9 @@ import (
 	"io"
 )
 
-type Connector interface {
-	Connect(ctx context.Context, opts ConnectOptions) (Session, error)
-}
+// ConnectFunc 是后端提供的标准化连接入口：后端只接收已解析好的 Target，
+// 不感知自动探测 / USB / PTP/IP 等应用层连接方式。
+type ConnectFunc func(ctx context.Context, target Target) (Session, error)
 
 type Discoverer interface {
 	Detect(ctx context.Context) ([]DetectedCamera, error)
