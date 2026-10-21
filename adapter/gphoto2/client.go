@@ -60,14 +60,14 @@ const (
 	gpFilePermDelete = 1 << 1
 )
 
-// Client 是 libgphoto2 后端，提供标准化 Connect 与 Detect。
+// GP2Client 是 libgphoto2 后端，提供标准化 Connect 与 Detect。
 // 与平台无关：Linux / macOS 使用系统安装的 libgphoto2，Android 使用随包 .so。
-type Client struct {
+type GP2Client struct {
 	ctx *C.GPContext
 }
 
 // New 创建 libgphoto2 后端并初始化 GPContext。
-func New(opts ...Option) (*Client, error) {
+func New(opts ...Option) (*GP2Client, error) {
 	o := applyOptions(opts)
 	if err := Bootstrap(o.libraryRoot, o.camlibDir, o.iolibDir); err != nil {
 		return nil, err
@@ -76,18 +76,18 @@ func New(opts ...Option) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{ctx: ctx}, nil
+	return &GP2Client{ctx: ctx}, nil
 }
 
 // Close 释放 GPContext。
-func (g *Client) Close() error {
+func (g *GP2Client) Close() error {
 	freeGPContext(g.ctx)
 	g.ctx = nil
 	return nil
 }
 
 // Detect 加载端口与能力列表，探测可用相机（USB），并附上所有可用端口。
-func (g *Client) Detect(ctx context.Context) ([]moment.DetectedCamera, error) {
+func (g *GP2Client) Detect(ctx context.Context) ([]moment.DetectedCamera, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (g *Client) Detect(ctx context.Context) ([]moment.DetectedCamera, error) {
 
 // Connect 用标准化目标（端口路径 + 模型名）建立相机连接。
 // 如何从用户请求推导 Target 由调用方的 TargetResolver 负责。
-func (g *Client) Connect(ctx context.Context, target moment.Target) (moment.Session, error) {
+func (g *GP2Client) Connect(ctx context.Context, target moment.Target) (moment.Session, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (g *Client) Connect(ctx context.Context, target moment.Target) (moment.Sess
 
 	slog.Debug("camera driver resolved", "driver", driver, "model", model, "port_path", portPath)
 
-	return &Camera{
+	return &GP2Camera{
 		client:   g,
 		cam:      cam,
 		model:    model,
@@ -209,7 +209,7 @@ func (g *Client) Connect(ctx context.Context, target moment.Target) (moment.Sess
 // lookupPort 在端口列表中定位指定路径的端口。
 // 返回的端口信息由列表持有：调用方必须保持列表存活（至少到 gp_camera_init 之后），
 // 并在使用完毕后释放列表。
-func (g *Client) lookupPort(portPath string) (*C.GPPortInfoList, C.GPPortInfo, error) {
+func (g *GP2Client) lookupPort(portPath string) (*C.GPPortInfoList, C.GPPortInfo, error) {
 	var pl *C.GPPortInfoList
 	if err := resultToError(int(C.gp_port_info_list_new(&pl))); err != nil {
 		return nil, nil, err
@@ -246,7 +246,7 @@ func (g *Client) lookupPort(portPath string) (*C.GPPortInfoList, C.GPPortInfo, e
 }
 
 // lookupAbilities 在能力列表中定位相机模型。
-func (g *Client) lookupAbilities(model string) (C.CameraAbilities, error) {
+func (g *GP2Client) lookupAbilities(model string) (C.CameraAbilities, error) {
 	var al *C.CameraAbilitiesList
 	if err := resultToError(int(C.gp_abilities_list_new(&al))); err != nil {
 		return C.CameraAbilities{}, err
@@ -268,10 +268,10 @@ func (g *Client) lookupAbilities(model string) (C.CameraAbilities, error) {
 	return abilities, nil
 }
 
-// Camera 是已连接相机上的会话实现。
-type Camera struct {
+// GP2Camera 是已连接相机上的会话实现。
+type GP2Camera struct {
 	mu       sync.Mutex
-	client   *Client
+	client   *GP2Client
 	cam      *C.Camera
 	model    string
 	driver   string
@@ -279,12 +279,12 @@ type Camera struct {
 	closed   bool
 }
 
-func (s *Camera) Model() string    { return s.model }
-func (s *Camera) Driver() string   { return s.driver }
-func (s *Camera) PortPath() string { return s.portPath }
+func (s *GP2Camera) Model() string    { return s.model }
+func (s *GP2Camera) Driver() string   { return s.driver }
+func (s *GP2Camera) PortPath() string { return s.portPath }
 
 // requireOpen 校验会话可用并加锁。
-func (s *Camera) requireOpen() error {
+func (s *GP2Camera) requireOpen() error {
 	if s.closed || s.cam == nil {
 		return moment.ErrNotConnected
 	}
@@ -292,7 +292,7 @@ func (s *Camera) requireOpen() error {
 }
 
 // ListFolders 列出目录下的子目录。
-func (s *Camera) ListFolders(ctx context.Context, folder string) ([]moment.Folder, error) {
+func (s *GP2Camera) ListFolders(ctx context.Context, folder string) ([]moment.Folder, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.requireOpen(); err != nil {
@@ -327,7 +327,7 @@ func (s *Camera) ListFolders(ctx context.Context, folder string) ([]moment.Folde
 }
 
 // ListFiles 列出目录下的文件（含文件信息）。
-func (s *Camera) ListFiles(ctx context.Context, folder string) ([]moment.File, error) {
+func (s *GP2Camera) ListFiles(ctx context.Context, folder string) ([]moment.File, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.requireOpen(); err != nil {
@@ -368,7 +368,7 @@ func (s *Camera) ListFiles(ctx context.Context, folder string) ([]moment.File, e
 }
 
 // GetFileInfo 查询单个文件信息。
-func (s *Camera) GetFileInfo(ctx context.Context, folder, name string) (moment.File, error) {
+func (s *GP2Camera) GetFileInfo(ctx context.Context, folder, name string) (moment.File, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.requireOpen(); err != nil {
@@ -385,7 +385,7 @@ func (s *Camera) GetFileInfo(ctx context.Context, folder, name string) (moment.F
 }
 
 // fileInfoLocked 调用 gp_camera_file_get_info 组装文件信息（需已持有锁）。
-func (s *Camera) fileInfoLocked(folderC, nameC *C.char) (moment.File, error) {
+func (s *GP2Camera) fileInfoLocked(folderC, nameC *C.char) (moment.File, error) {
 	var ci C.CameraFileInfo
 	if err := resultToError(int(C.gp_camera_file_get_info(s.cam, folderC, nameC, &ci, s.client.ctx))); err != nil {
 		return moment.File{}, err
@@ -421,7 +421,7 @@ func (s *Camera) fileInfoLocked(folderC, nameC *C.char) (moment.File, error) {
 }
 
 // Download 下载文件完整内容。
-func (s *Camera) Download(ctx context.Context, folder, name string) ([]byte, error) {
+func (s *GP2Camera) Download(ctx context.Context, folder, name string) ([]byte, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.requireOpen(); err != nil {
@@ -457,7 +457,7 @@ func (s *Camera) Download(ctx context.Context, folder, name string) ([]byte, err
 
 // Open 打开文件内容。libgphoto2 当前一次性读取完整文件，因此以内存 reader 返回；
 // 接口保留 io.ReadCloser 语义，便于未来替换为分块流式实现。
-func (s *Camera) Open(ctx context.Context, folder, name string) (io.ReadCloser, error) {
+func (s *GP2Camera) Open(ctx context.Context, folder, name string) (io.ReadCloser, error) {
 	data, err := s.Download(ctx, folder, name)
 	if err != nil {
 		return nil, err
@@ -466,7 +466,7 @@ func (s *Camera) Open(ctx context.Context, folder, name string) (io.ReadCloser, 
 }
 
 // DownloadTo 下载文件并写入 w。
-func (s *Camera) DownloadTo(ctx context.Context, folder, name string, w io.Writer) error {
+func (s *GP2Camera) DownloadTo(ctx context.Context, folder, name string, w io.Writer) error {
 	data, err := s.Download(ctx, folder, name)
 	if err != nil {
 		return err
@@ -476,7 +476,7 @@ func (s *Camera) DownloadTo(ctx context.Context, folder, name string, w io.Write
 }
 
 // GetInfo 聚合相机信息。
-func (s *Camera) GetInfo(ctx context.Context) (moment.CameraInfo, error) {
+func (s *GP2Camera) GetInfo(ctx context.Context) (moment.CameraInfo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.requireOpen(); err != nil {
@@ -522,7 +522,7 @@ func (s *Camera) GetInfo(ctx context.Context) (moment.CameraInfo, error) {
 }
 
 // storageInfoLocked 读取存储信息（需已持有锁）。
-func (s *Camera) storageInfoLocked() ([]moment.StorageInfo, error) {
+func (s *GP2Camera) storageInfoLocked() ([]moment.StorageInfo, error) {
 	var arr *C.CameraStorageInformation
 	var n C.int
 	if err := resultToError(int(C.gp_camera_get_storageinfo(s.cam, &arr, &n, s.client.ctx))); err != nil {
@@ -558,7 +558,7 @@ func (s *Camera) storageInfoLocked() ([]moment.StorageInfo, error) {
 }
 
 // configLocked 读取并解析配置树（需已持有锁）。
-func (s *Camera) configLocked() (*moment.ConfigItem, error) {
+func (s *GP2Camera) configLocked() (*moment.ConfigItem, error) {
 	var root *C.CameraWidget
 	if err := resultToError(int(C.gp_camera_get_config(s.cam, &root, s.client.ctx))); err != nil {
 		return nil, err
@@ -568,7 +568,7 @@ func (s *Camera) configLocked() (*moment.ConfigItem, error) {
 }
 
 // Close 断开相机并释放资源。
-func (s *Camera) Close(ctx context.Context) error {
+func (s *GP2Camera) Close(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
