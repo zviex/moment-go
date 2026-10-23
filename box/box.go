@@ -38,7 +38,7 @@ type Options struct {
 // Box 持有应用的全部长生命周期依赖。
 type Box struct {
 	Config    *config.Store
-	Camera    *moment.Client
+	Client    *moment.Client
 	Storage   *storage.Disk
 	Downloads *download.Manager
 	Sync      *sync.Recorder
@@ -80,28 +80,26 @@ func New(ctx context.Context, opts Options) (*Box, error) {
 		return nil, fmt.Errorf("box: open download store: %w", err)
 	}
 
-	downloader := download.NewCameraDownloader(func() (adapter.Camera, error) {
-		cam, err := clients.Camera()
-		if err != nil {
-			return nil, err
-		}
-		return cam, nil
-	}, disk)
+	files := moment.NewFileAccess(clients)
+	info := moment.NewInfoAccess(clients)
+	capture := moment.NewCaptureAccess(clients)
+
+	downloader := download.NewCameraDownloader(files, disk)
 	manager := download.NewManager(ctx, store, downloader)
-	recorder := sync.NewRecorder(ctx, nil, downloader)
+	recorder := sync.NewRecorder(ctx, capture, downloader)
 
 	cfg := config.NewStore()
 	network := networkFor(opts.SocketAddr)
 	srv := server.NewServer(network)
 
-	camerav1.RegisterCameraServiceServer(srv, camera.New(clients))
+	camerav1.RegisterCameraServiceServer(srv, camera.New(info, files))
 	connectionv1.RegisterCameraConnectionServiceServer(srv, connection.New(clients, resolver, cfg))
 	downloadv1.RegisterDownloadServiceServer(srv, download.New(manager))
 	syncv1.RegisterAutoSyncServiceServer(srv, sync.New(recorder))
 
 	return &Box{
 		Config:    cfg,
-		Camera:    clients,
+		Client:    clients,
 		Storage:   disk,
 		Downloads: manager,
 		Sync:      recorder,
@@ -137,8 +135,8 @@ func (b *Box) Close() error {
 	}
 
 	var errs []error
-	if b.Camera != nil {
-		if err := b.Camera.Close(); err != nil {
+	if b.Client != nil {
+		if err := b.Client.Close(); err != nil {
 			errs = append(errs, err)
 		}
 	}

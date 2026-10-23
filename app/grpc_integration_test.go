@@ -151,7 +151,7 @@ func markDisconnected() {
 // ensureDisconnected 确保后端未连接，供 PTP/IP 负向用例使用：
 // moment.Client 对已连接会话会直接复用，只有未连接时才会真正尝试建连。
 func ensureDisconnected(t *testing.T) {
-	if testEnv.app.Camera.IsConnected() {
+	if testEnv.app.Client.IsConnected() {
 		if _, err := testEnv.connSvc.DisconnectCamera(context.Background(),
 			&connectionv1.DisconnectCameraRequest{}); err != nil {
 			t.Fatalf("precondition disconnect: %v", err)
@@ -258,7 +258,7 @@ func TestConnectionService(t *testing.T) {
 	})
 
 	t.Run("DisconnectCamera_WhenDisconnected_IsNoop", func(t *testing.T) {
-		if testEnv.app.Camera.IsConnected() {
+		if testEnv.app.Client.IsConnected() {
 			t.Skip("camera connected, covered by TestDisconnectCamera lifecycle")
 		}
 
@@ -394,7 +394,7 @@ func TestDisconnectCamera(t *testing.T) {
 		t.Fatalf("DisconnectCamera: %v", err)
 	}
 
-	if testEnv.app.Camera.IsConnected() {
+	if testEnv.app.Client.IsConnected() {
 		t.Fatal("client still reports connected after DisconnectCamera")
 	}
 }

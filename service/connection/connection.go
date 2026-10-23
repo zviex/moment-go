@@ -3,20 +3,19 @@ package connection
 import (
 	"context"
 
-	"ci.zevix.uk/moment-go/adapter"
-	"ci.zevix.uk/moment-go/pkg/moment"
+	"ci.zevix.uk/moment-go/adapter/ports"
 	connectionv1 "ci.zevix.uk/moment/moment-protogo/connection/v1"
 )
 
 type Service struct {
 	connectionv1.UnimplementedCameraConnectionServiceServer
 
-	cameras  *moment.Client
-	resolver adapter.TargetResolver
-	config   adapter.ConfigStore
+	cameras  ports.ConnectionManager
+	resolver ports.TargetResolver
+	config   ports.ConfigStore
 }
 
-func New(cameras *moment.Client, resolver adapter.TargetResolver, config adapter.ConfigStore) *Service {
+func New(cameras ports.ConnectionManager, resolver ports.TargetResolver, config ports.ConfigStore) *Service {
 	return &Service{cameras: cameras, resolver: resolver, config: config}
 }
 
@@ -31,14 +30,14 @@ func (s *Service) ConnectCamera(ctx context.Context, req *connectionv1.ConnectCa
 		return nil, err
 	}
 
-	cam, err := s.cameras.Connect(ctx, target)
+	info, err := s.cameras.Connect(ctx, target)
 	if err != nil {
 		return nil, err
 	}
 
 	return &connectionv1.ConnectCameraResponse{
-		Model: cam.Model(),
-		Port:  cam.PortPath(),
+		Model: info.Model,
+		Port:  info.PortPath,
 	}, nil
 }
 

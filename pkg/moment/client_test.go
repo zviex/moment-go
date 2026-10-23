@@ -3,29 +3,48 @@ package moment
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
+	"sync"
 	"testing"
+
+	"ci.zevix.uk/moment-go/adapter"
+	"ci.zevix.uk/moment-go/adapter/ports"
+	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
 )
 
 // fakeBackend 提供标准化 Connect 与 Discoverer，用于无硬件测试。
-type fakeBackend struct{}
-
-func (fakeBackend) Detect(context.Context) ([]DetectedCamera, error) {
-	return []DetectedCamera{{Model: "TestCam", PortPath: "usb:001,002"}}, nil
+type fakeBackend struct {
+	newSession func() adapter.Session
 }
 
-func (fakeBackend) Connect(ctx context.Context, _ Target) (Session, error) {
+func (b fakeBackend) Detect(context.Context) ([]adapter.DetectedCamera, error) {
+	return []adapter.DetectedCamera{{Model: "TestCam", PortPath: "usb:001,002"}}, nil
+}
+
+func (b fakeBackend) Connect(ctx context.Context, _ *camerav1.Tartget) (adapter.Session, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	default:
 	}
-	return &fakeSession{tree: fakeTree(), files: fakeFiles()}, nil
+	if b.newSession != nil {
+		return b.newSession(), nil
+	}
+	return newFakeSession(), nil
 }
 
 type fakeSession struct {
 	tree  map[string][]string
-	files map[string][]File
+	files map[string][]*camerav1.FileEntry
+
+	blockDownload bool
+	started       chan struct{}
+	startOnce     sync.Once
+}
+
+func newFakeSession() *fakeSession {
+	return &fakeSession{tree: fakeTree(), files: fakeFiles()}
 }
 
 func fakeTree() map[string][]string {
@@ -37,8 +56,8 @@ func fakeTree() map[string][]string {
 	}
 }
 
-func fakeFiles() map[string][]File {
-	return map[string][]File{
+func fakeFiles() map[string][]*camerav1.FileEntry {
+	return map[string][]*camerav1.FileEntry{
 		"/store_00010001/DCIM/100CANON": {
 			{Name: "IMG_0001.JPG", Size: 2048, MimeType: "image/jpeg"},
 			{Name: "IMG_0002.JPG", Size: 4096, MimeType: "image/jpeg"},
@@ -50,82 +69,84 @@ func (s *fakeSession) Model() string    { return "TestCam" }
 func (s *fakeSession) Driver() string   { return "fake" }
 func (s *fakeSession) PortPath() string { return "usb:001,002" }
 
-func (s *fakeSession) ListFolders(_ context.Context, folder string) ([]Folder, error) {
-	names, ok := s.tree[folder]
-	if !ok {
-		return nil, ErrDirectoryNotFound
-	}
-	out := make([]Folder, 0, len(names))
-	for _, n := range names {
-		p := "/" + n
-		if folder != "/" {
-			p = folder + "/" + n
-		}
-		out = append(out, Folder{Name: n, Path: p})
-	}
-	return out, nil
-}
-
-func (s *fakeSession) ListFiles(_ context.Context, folder string) ([]File, error) {
+func (s *fakeSession) List(_ context.Context, folder string) (*camerav1.FileContent, error) {
 	if _, ok := s.tree[folder]; !ok {
 		if _, ok := s.files[folder]; !ok {
 			return nil, ErrDirectoryNotFound
 		}
 	}
-	out := make([]File, 0, len(s.files[folder]))
-	for _, f := range s.files[folder] {
-		f.Folder = folder
-		out = append(out, f)
-	}
-	return out, nil
+	return &camerav1.FileContent{
+		Folders: s.tree[folder],
+		Files:   s.files[folder],
+	}, nil
 }
 
-func (s *fakeSession) GetFileInfo(_ context.Context, folder, name string) (File, error) {
+func (s *fakeSession) GetFileInfo(_ context.Context, folder, name string) (*camerav1.FileEntry, error) {
 	for _, f := range s.files[folder] {
 		if f.Name == name {
 			return f, nil
 		}
 	}
-	return File{}, ErrFileNotFound
+	return nil, ErrFileNotFound
 }
 
-func (s *fakeSession) Open(_ context.Context, folder, name string) (io.ReadCloser, error) {
-	f, err := s.GetFileInfo(context.Background(), folder, name)
-	if err != nil {
-		return nil, err
+func (s *fakeSession) DownloadTo(ctx context.Context, folder, name string, w io.Writer) error {
+	if s.blockDownload {
+		s.startOnce.Do(func() {
+			if s.started != nil {
+				close(s.started)
+			}
+		})
+		<-ctx.Done()
+		return ctx.Err()
 	}
-	return io.NopCloser(bytes.NewReader(bytes.Repeat([]byte("x"), int(f.Size)))), nil
+
+	f, err := s.GetFileInfo(ctx, folder, name)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(bytes.Repeat([]byte("x"), int(f.Size)))
+	return err
 }
 
-func (s *fakeSession) GetInfo(context.Context) (CameraInfo, error) {
-	return CameraInfo{Model: "TestCam", Driver: "fake", PortPath: "usb:001,002"}, nil
+func (s *fakeSession) GetInfo(context.Context) (*camerav1.CameraSummary, error) {
+	return &camerav1.CameraSummary{Model: "TestCam", Driver: "fake", PortPath: "usb:001,002"}, nil
+}
+
+func (s *fakeSession) Events(ctx context.Context) (<-chan ports.CaptureEvent, error) {
+	ch := make(chan ports.CaptureEvent)
+	go func() {
+		defer close(ch)
+		<-ctx.Done()
+	}()
+	return ch, nil
 }
 
 func (s *fakeSession) Close(context.Context) error { return nil }
 
-func newTestClient() *Client {
-	b := fakeBackend{}
-	return NewClient(b.Connect, b)
+func newTestClient() (*Client, *fakeBackend) {
+	b := &fakeBackend{}
+	return NewClient(b.Connect, b), b
 }
 
 func TestConnectLifecycle(t *testing.T) {
-	c := newTestClient()
+	c, _ := newTestClient()
 	ctx := context.Background()
 
-	cam, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
+	info, err := c.Connect(ctx, &camerav1.Tartget{PortPath: "usb:001,002", Model: "TestCam"})
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
-	if cam == nil || !c.IsConnected() {
-		t.Fatal("expected connected camera")
+	if info.Model != "TestCam" || !c.IsConnected() {
+		t.Fatalf("unexpected connection info: %+v, connected=%v", info, c.IsConnected())
 	}
 
-	same, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
+	same, err := c.Connect(ctx, &camerav1.Tartget{PortPath: "usb:001,002", Model: "TestCam"})
 	if err != nil {
 		t.Fatalf("second connect should reuse session: %v", err)
 	}
-	if same.session != cam.session {
-		t.Fatal("second connect should return the same connected session")
+	if same != info {
+		t.Fatalf("second connect info = %+v, want %+v", same, info)
 	}
 
 	if err := c.Disconnect(ctx); err != nil {
@@ -140,70 +161,51 @@ func TestConnectLifecycle(t *testing.T) {
 }
 
 func TestOperationsRequireConnection(t *testing.T) {
-	c := newTestClient()
+	c, _ := newTestClient()
 
-	if _, err := c.Camera(); err != ErrNotConnected {
+	if _, err := NewFileAccess(c).List(context.Background(), "/"); !errors.Is(err, ErrNotConnected) {
+		t.Fatalf("expected ErrNotConnected, got %v", err)
+	}
+	if _, err := NewInfoAccess(c).GetInfo(context.Background()); !errors.Is(err, ErrNotConnected) {
 		t.Fatalf("expected ErrNotConnected, got %v", err)
 	}
 }
 
-func TestListTreeWalksAllFolders(t *testing.T) {
-	c := newTestClient()
-	ctx := context.Background()
-	cam, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cam.Close(ctx)
-
-	content, err := cam.ListTree(ctx)
-	if err != nil {
-		t.Fatalf("ListTree: %v", err)
-	}
-	if len(content.Folders) != 4 {
-		t.Fatalf("folders = %d, want 4", len(content.Folders))
-	}
-	if len(content.Files) != 2 {
-		t.Fatalf("files = %d, want 2", len(content.Files))
-	}
-}
-
 func TestDownloadRoundTrip(t *testing.T) {
-	c := newTestClient()
+	c, _ := newTestClient()
 	ctx := context.Background()
-	cam, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
-	if err != nil {
+	if _, err := c.Connect(ctx, &camerav1.Tartget{PortPath: "usb:001,002", Model: "TestCam"}); err != nil {
 		t.Fatal(err)
 	}
-	defer cam.Close(ctx)
+	defer c.Close()
 
-	data, err := cam.Download(ctx, "/store_00010001/DCIM/100CANON", "IMG_0001.JPG")
-	if err != nil {
+	files := NewFileAccess(c)
+	var buf bytes.Buffer
+	if err := files.DownloadTo(ctx, "/store_00010001/DCIM/100CANON", "IMG_0001.JPG", &buf); err != nil {
 		t.Fatalf("download: %v", err)
 	}
-	if len(data) != 2048 {
-		t.Fatalf("downloaded %d bytes, want 2048", len(data))
+	if buf.Len() != 2048 {
+		t.Fatalf("downloaded %d bytes, want 2048", buf.Len())
 	}
 
-	var buf bytes.Buffer
-	if err := cam.DownloadTo(ctx, "/store_00010001/DCIM/100CANON", "IMG_0002.JPG", &buf); err != nil {
-		t.Fatalf("downloadTo: %v", err)
+	info, err := files.GetFileInfo(ctx, "/store_00010001/DCIM/100CANON", "IMG_0002.JPG")
+	if err != nil {
+		t.Fatalf("get file info: %v", err)
 	}
-	if buf.Len() != 4096 {
-		t.Fatalf("downloadTo %d bytes, want 4096", buf.Len())
+	if info.GetSize() != 4096 {
+		t.Fatalf("file size = %d, want 4096", info.GetSize())
 	}
 }
 
 func TestGetInfo(t *testing.T) {
-	c := newTestClient()
+	c, _ := newTestClient()
 	ctx := context.Background()
-	cam, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
-	if err != nil {
+	if _, err := c.Connect(ctx, &camerav1.Tartget{PortPath: "usb:001,002", Model: "TestCam"}); err != nil {
 		t.Fatal(err)
 	}
-	defer cam.Close(ctx)
+	defer c.Close()
 
-	info, err := cam.GetInfo(ctx)
+	info, err := NewInfoAccess(c).GetInfo(ctx)
 	if err != nil {
 		t.Fatalf("GetInfo: %v", err)
 	}
@@ -212,11 +214,72 @@ func TestGetInfo(t *testing.T) {
 	}
 }
 
+func TestDisconnectCancelsInFlightOperation(t *testing.T) {
+	started := make(chan struct{})
+	c, _ := newTestClient()
+	c.connect = func(ctx context.Context, _ *camerav1.Tartget) (adapter.Session, error) {
+		s := newFakeSession()
+		s.blockDownload = true
+		s.started = started
+		return s, nil
+	}
+
+	ctx := context.Background()
+	if _, err := c.Connect(ctx, &camerav1.Tartget{PortPath: "usb:001,002", Model: "TestCam"}); err != nil {
+		t.Fatal(err)
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- NewFileAccess(c).DownloadTo(ctx, "/store_00010001/DCIM/100CANON", "IMG_0001.JPG", io.Discard)
+	}()
+
+	<-started
+	if err := c.Disconnect(ctx); err != nil {
+		t.Fatalf("disconnect: %v", err)
+	}
+
+	select {
+	case err := <-errCh:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("in-flight download error = %v, want context.Canceled", err)
+		}
+	default:
+		// Disconnect 会等待租约释放，因此这里理论上已经结束。
+		t.Fatal("in-flight download did not finish before disconnect returned")
+	}
+}
+
+func TestCaptureStreamClosesOnDisconnect(t *testing.T) {
+	c, _ := newTestClient()
+	ctx := context.Background()
+	if _, err := c.Connect(ctx, &camerav1.Tartget{PortPath: "usb:001,002", Model: "TestCam"}); err != nil {
+		t.Fatal(err)
+	}
+
+	ch, err := NewCaptureAccess(c).Events(ctx)
+	if err != nil {
+		t.Fatalf("events: %v", err)
+	}
+	if err := c.Disconnect(ctx); err != nil {
+		t.Fatalf("disconnect: %v", err)
+	}
+
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Fatal("expected capture stream to be closed")
+		}
+	default:
+		t.Fatal("capture stream did not close on disconnect")
+	}
+}
+
 func TestConnectCanceledContext(t *testing.T) {
-	c := newTestClient()
+	c, _ := newTestClient()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := c.Connect(ctx, Target{PortPath: "usb:001,002", Model: "TestCam"})
+	_, err := c.Connect(ctx, &camerav1.Tartget{PortPath: "usb:001,002", Model: "TestCam"})
 	if err == nil {
 		t.Fatal("expected canceled context error")
 	}

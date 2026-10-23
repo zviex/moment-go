@@ -6,7 +6,9 @@ import (
 	"context"
 	"log/slog"
 
+	"ci.zevix.uk/moment-go/adapter"
 	"ci.zevix.uk/moment-go/pkg/moment"
+	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
 )
 
 // Client 是未启用 cgo（CGO_ENABLED=0）时的桩后端。
@@ -28,7 +30,7 @@ func New(_ ...Option) (*Client, error) {
 func (g *Client) Close() error { return nil }
 
 // Detect 在无 cgo 构建下没有可探测的相机，返回空结果。
-func (g *Client) Detect(ctx context.Context) ([]moment.DetectedCamera, error) {
+func (g *Client) Detect(ctx context.Context) ([]adapter.DetectedCamera, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -37,7 +39,7 @@ func (g *Client) Detect(ctx context.Context) ([]moment.DetectedCamera, error) {
 }
 
 // Connect 在无 cgo 构建下不可用。
-func (g *Client) Connect(_ context.Context, _ moment.Target) (moment.Session, error) {
+func (g *Client) Connect(_ context.Context, _ *camerav1.Tartget) (adapter.Session, error) {
 	slog.Warn("libgphoto2 backend unavailable: rebuild with CGO_ENABLED=1")
 	return nil, moment.ErrBackendUnavailable
 }

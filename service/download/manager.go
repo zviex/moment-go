@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"ci.zevix.uk/moment-go/adapter"
+	"ci.zevix.uk/moment-go/adapter/ports"
 	"ci.zevix.uk/moment-go/pkg/pubsub"
 	"ci.zevix.uk/moment-go/pkg/task"
 	downloadv1 "ci.zevix.uk/moment/moment-protogo/download/v1"
@@ -44,10 +44,10 @@ type Manager struct {
 	tasks      map[string]*taskHandle
 	rootCtx    context.Context
 	store      *Store
-	downloader adapter.Downloader
+	downloader ports.Downloader
 }
 
-func NewManager(rootCtx context.Context, store *Store, downloader adapter.Downloader) *Manager {
+func NewManager(rootCtx context.Context, store *Store, downloader ports.Downloader) *Manager {
 	if rootCtx == nil {
 		rootCtx = context.Background()
 	}
@@ -190,7 +190,7 @@ func (m *Manager) remove(id string) {
 func (h *taskHandle) taskID() string { return h.id }
 
 // makeWork 把共享的 Downloader 包装成泛型任务要求的 WorkFunc。
-func makeWork(d adapter.Downloader) task.WorkFunc {
+func makeWork(d ports.Downloader) task.WorkFunc {
 	return func(ctx context.Context, url string, onProgress func(task.Progress)) error {
 		if d == nil {
 			return ErrNoCamera

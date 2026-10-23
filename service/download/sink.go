@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"ci.zevix.uk/moment-go/adapter"
+	"ci.zevix.uk/moment-go/adapter/ports"
 	"ci.zevix.uk/moment-go/pkg/task"
 	"ci.zevix.uk/moment-go/storage"
 )
@@ -16,13 +16,14 @@ var (
 	ErrNoStorage = errors.New("download: storage unavailable")
 )
 
-func NewCameraDownloader(cam adapter.CameraProvider, store storage.Storage) adapter.Downloader {
-	return &cameraDownloader{cam: cam, storage: store}
+func NewCameraDownloader(reader ports.FileReader, store storage.Storage) ports.Downloader {
+	return &cameraDownloader{reader: reader, storage: store}
 }
 
 // countWriter 包装底层 writer 并对写入字节计数，从而实现进度上报。
 type countWriter struct {
 	io.Writer
+
 	n int64
 }
 
@@ -33,7 +34,7 @@ func (w *countWriter) Write(p []byte) (int, error) {
 }
 
 type cameraDownloader struct {
-	cam     adapter.CameraProvider
+	reader  ports.FileReader
 	storage storage.Storage
 }
 
@@ -43,11 +44,11 @@ func (d *cameraDownloader) Download(ctx context.Context, url string, onProgress 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if d.reader == nil {
+		return ErrNoCamera
+	}
 	if d.storage == nil {
 		return ErrNoStorage
-	}
-	if d.cam == nil {
-		return ErrNoCamera
 	}
 
 	if onProgress == nil {
@@ -89,13 +90,7 @@ func (d *cameraDownloader) doDownload(ctx context.Context, ref fileRef, w io.Wri
 		return err
 	}
 
-	cam, err := d.cam()
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrNoCamera, err)
-	}
-
-	err = cam.DownloadTo(ctx, ref.folder, ref.name, w)
-	if err != nil {
+	if err := d.reader.DownloadTo(ctx, ref.folder, ref.name, w); err != nil {
 		return err
 	}
 	// 若流式实现逐步写入了字节，这里也能逐阈值推进。
@@ -105,14 +100,9 @@ func (d *cameraDownloader) doDownload(ctx context.Context, ref fileRef, w io.Wri
 
 // fileSize 尝试获取文件大小；无法获取时返回 -1。
 func (d *cameraDownloader) fileSize(ctx context.Context, ref fileRef) (int64, error) {
-	cam, err := d.cam()
+	info, err := d.reader.GetFileInfo(ctx, ref.folder, ref.name)
 	if err != nil {
 		return -1, err
 	}
-
-	file, err := cam.GetFileInfo(ctx, ref.folder, ref.name)
-	if err != nil {
-		return -1, err
-	}
-	return file.Size, nil
+	return info.GetSize(), nil
 }
