@@ -31,8 +31,8 @@ func NewFileAccess(client *Client) *FileAccess {
 	return &FileAccess{client: client}
 }
 
-func (f *FileAccess) List(ctx context.Context, folder string) ([]*camerav1.FileContent, error) {
-	var out []*camerav1.FileContent
+func (f *FileAccess) List(ctx context.Context, folder string) (*camerav1.FileContent, error) {
+	var out *camerav1.FileContent
 	err := f.client.withSession(ctx, func(ctx context.Context, sess adapter.Session) error {
 		var err error
 		out, err = sess.List(ctx, folder)

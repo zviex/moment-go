@@ -69,16 +69,16 @@ func (s *fakeSession) Model() string    { return "TestCam" }
 func (s *fakeSession) Driver() string   { return "fake" }
 func (s *fakeSession) PortPath() string { return "usb:001,002" }
 
-func (s *fakeSession) List(_ context.Context, folder string) ([]*camerav1.FileContent, error) {
+func (s *fakeSession) List(_ context.Context, folder string) (*camerav1.FileContent, error) {
 	if _, ok := s.tree[folder]; !ok {
 		if _, ok := s.files[folder]; !ok {
 			return nil, ErrDirectoryNotFound
 		}
 	}
-	return []*camerav1.FileContent{{
+	return &camerav1.FileContent{
 		Folders: s.tree[folder],
 		Files:   s.files[folder],
-	}}, nil
+	}, nil
 }
 
 func (s *fakeSession) GetFileInfo(_ context.Context, folder, name string) (*camerav1.FileEntry, error) {

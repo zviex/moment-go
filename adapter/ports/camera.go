@@ -10,7 +10,7 @@ import (
 
 // FileLister 列出相机目录下的直接子目录与文件。
 type FileLister interface {
-	List(ctx context.Context, folder string) ([]*camerav1.FileContent, error)
+	List(ctx context.Context, folder string) (*camerav1.FileContent, error)
 }
 
 // FileStatter 读取相机文件元信息。
