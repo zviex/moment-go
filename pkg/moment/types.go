@@ -34,35 +34,3 @@ var (
 
 // IsBackendUnavailable 判断错误是否为“当前构建不含 libgphoto2 后端”。
 func IsBackendUnavailable(err error) bool { return errors.Is(err, ErrBackendUnavailable) }
-
-// DetectedCamera 是自动探测到的一台相机。
-// ConfigType 是相机配置项（widget）类型。
-type ConfigType int
-
-const (
-	ConfigWindow  ConfigType = iota // 顶层窗口
-	ConfigSection                   // 分组
-	ConfigText                      // 文本
-	ConfigRange                     // 数值区间（float）
-	ConfigToggle                    // 开关（bool/int）
-	ConfigRadio                     // 单选
-	ConfigMenu                      // 菜单（同单选）
-	ConfigButton                    // 按钮
-	ConfigDate                      // 日期（int 时间戳）
-)
-
-// ConfigItem 是相机配置树中的一个节点。
-type ConfigItem struct {
-	Name     string
-	Label    string
-	Info     string
-	Type     ConfigType
-	Value    any // string / float64 / int，取决于 Type
-	Choices  []string
-	ReadOnly bool
-	Children []*ConfigItem
-}
-
-func (c ConfigItem) String() string {
-	return ""
-}

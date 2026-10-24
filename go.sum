@@ -8,6 +8,10 @@ ci.zevix.uk/moment/moment-protogo v0.0.0-20261021125009-1d407f0dd648 h1:bpIe0PBD
 ci.zevix.uk/moment/moment-protogo v0.0.0-20261021125009-1d407f0dd648/go.mod h1:E3qcnpoQdBwYvZpDHnfwj/D+xpvjLTS7LO0m9RYVtk4=
 ci.zevix.uk/moment/moment-protogo v0.0.0-20261021135113-727bea24c846 h1:r5QwVRZunj59mgmF9s9QNgqblixBUf07M8/7Fwhu1Hs=
 ci.zevix.uk/moment/moment-protogo v0.0.0-20261021135113-727bea24c846/go.mod h1:E3qcnpoQdBwYvZpDHnfwj/D+xpvjLTS7LO0m9RYVtk4=
+ci.zevix.uk/moment/moment-protogo v0.0.0-20261023124646-4925b905543f h1:vRQYb/XW/QrfS5/iLXr3Me5J39O6MOoVXKwkIgThlc8=
+ci.zevix.uk/moment/moment-protogo v0.0.0-20261023124646-4925b905543f/go.mod h1:E3qcnpoQdBwYvZpDHnfwj/D+xpvjLTS7LO0m9RYVtk4=
+ci.zevix.uk/moment/moment-protogo v0.0.0-20261024145258-ac5a7d1cda1b h1:6qwvlZlcI0XHiIdlJy9f+vNMNag3uDIUlH9cRacIRp8=
+ci.zevix.uk/moment/moment-protogo v0.0.0-20261024145258-ac5a7d1cda1b/go.mod h1:E3qcnpoQdBwYvZpDHnfwj/D+xpvjLTS7LO0m9RYVtk4=
 github.com/cenkalti/backoff/v5 v5.0.3 h1:ZN+IMa753KfX5hd8vVaMixjnqRZ3y8CuJKRKj1xcsSM=
 github.com/cenkalti/backoff/v5 v5.0.3/go.mod h1:rkhZdG3JZukswDf7f0cwqPNk4K0sa+F97BxZthm/crw=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=

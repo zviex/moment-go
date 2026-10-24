@@ -44,7 +44,9 @@ import (
 	"ci.zevix.uk/moment-go/adapter/ports"
 	"ci.zevix.uk/moment-go/pkg/moment"
 	camerav1 "ci.zevix.uk/moment/moment-protogo/camera/v1"
+	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // 文件信息字段位掩码（gphoto2-filesys.h）。
@@ -515,9 +517,8 @@ func (s *GP2Camera) Close(ctx context.Context) error {
 	return nil
 }
 
-// parseWidget 递归解析 CameraWidget 树为领域配置树。
-func parseWidget(w *C.CameraWidget) (*moment.ConfigItem, error) {
-	item := &moment.ConfigItem{}
+func parseWidget(w *C.CameraWidget) (*camerav1.ConfigItem, error) {
+	item := &camerav1.ConfigItem{}
 	var name, label, info *C.char
 	C.gp_widget_get_name(w, &name)
 	C.gp_widget_get_label(w, &label)
@@ -538,20 +539,24 @@ func parseWidget(w *C.CameraWidget) (*moment.ConfigItem, error) {
 
 	// 按类型读取值。字符串类型写入 char*，数值类型写入对应标量。
 	switch item.Type {
-	case moment.ConfigText, moment.ConfigRadio, moment.ConfigMenu:
+	case camerav1.ConfigType_CONFIG_TYPE_TEXT, camerav1.ConfigType_CONFIG_TYPE_RADIO, camerav1.ConfigType_CONFIG_TYPE_MENU:
 		var v *C.char
 		if C.gp_widget_get_value(w, unsafe.Pointer(&v)) == 0 {
-			item.Value = C.GoString(v)
+			va, _ := anypb.New(wrapperspb.String(C.GoString(v)))
+			item.Value = va
 		}
-	case moment.ConfigToggle, moment.ConfigDate:
+	case camerav1.ConfigType_CONFIG_TYPE_TOGGLE, camerav1.ConfigType_CONFIG_TYPE_DATE:
 		var v C.int
 		if C.gp_widget_get_value(w, unsafe.Pointer(&v)) == 0 {
-			item.Value = int(v)
+			va, _ := anypb.New(wrapperspb.Int32(int32(v)))
+			item.Value = va
 		}
-	case moment.ConfigRange:
+	case camerav1.ConfigType_CONFIG_TYPE_RANGE:
 		var v C.float
 		if C.gp_widget_get_value(w, unsafe.Pointer(&v)) == 0 {
-			item.Value = float64(v)
+
+			va, _ := anypb.New(wrapperspb.Float(float32(v)))
+			item.Value = va
 		}
 	}
 
@@ -581,29 +586,28 @@ func parseWidget(w *C.CameraWidget) (*moment.ConfigItem, error) {
 	return item, nil
 }
 
-// widgetTypeToDomain 把 C 的 CameraWidgetType 映射为领域类型。
-func widgetTypeToDomain(t int) moment.ConfigType {
+func widgetTypeToDomain(t int) camerav1.ConfigType {
 	switch t {
 	case 0: // GP_WIDGET_WINDOW
-		return moment.ConfigWindow
+		return camerav1.ConfigType_CONFIG_TYPE_WINDOW
 	case 1: // GP_WIDGET_SECTION
-		return moment.ConfigSection
+		return camerav1.ConfigType_CONFIG_TYPE_SECTION
 	case 2: // GP_WIDGET_TEXT
-		return moment.ConfigText
+		return camerav1.ConfigType_CONFIG_TYPE_TEXT
 	case 3: // GP_WIDGET_RANGE
-		return moment.ConfigRange
+		return camerav1.ConfigType_CONFIG_TYPE_RANGE
 	case 4: // GP_WIDGET_TOGGLE
-		return moment.ConfigToggle
+		return camerav1.ConfigType_CONFIG_TYPE_TOGGLE
 	case 5: // GP_WIDGET_RADIO
-		return moment.ConfigRadio
+		return camerav1.ConfigType_CONFIG_TYPE_RADIO
 	case 6: // GP_WIDGET_MENU
-		return moment.ConfigMenu
+		return camerav1.ConfigType_CONFIG_TYPE_MENU
 	case 7: // GP_WIDGET_BUTTON
-		return moment.ConfigButton
+		return camerav1.ConfigType_CONFIG_TYPE_BUTTON
 	case 8: // GP_WIDGET_DATE
-		return moment.ConfigDate
+		return camerav1.ConfigType_CONFIG_TYPE_DATE
 	default:
-		return moment.ConfigSection
+		return camerav1.ConfigType_CONFIG_TYPE_SECTION
 	}
 }
 
@@ -699,7 +703,7 @@ func (s *GP2Camera) storageInfoLocked() ([]*camerav1.StorageInfo, error) {
 }
 
 // configLocked 读取并解析配置树（需已持有锁）。
-func (s *GP2Camera) configLocked() (*moment.ConfigItem, error) {
+func (s *GP2Camera) configLocked() (*camerav1.ConfigItem, error) {
 	var root *C.CameraWidget
 	if err := resultToError(int(C.gp_camera_get_config(s.cam, &root, s.client.ctx))); err != nil {
 		return nil, err
