@@ -75,10 +75,17 @@ func (s *Service) MonitorTask(req *downloadv1.MonitorTaskRequest, stream grpc.Se
 	t.Snapshot()
 
 	ctx := stream.Context()
+	// MonitorTask 是长生命周期流。gRPC 的 GracefulStop 不会取消在途流的
+	// ctx，如果只依赖 stream.Context()，进程收到 SIGINT 后会一直等客户端
+	// 关闭流。这里额外监听服务根 ctx（随进程信号取消），保证优雅关闭能
+	// 正常结束。
+	rootDone := s.manager.root(ctx).Done()
 
 	for {
 		select {
 		case <-ctx.Done():
+			return nil
+		case <-rootDone:
 			return nil
 		case <-sub.Done():
 			return nil

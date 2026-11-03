@@ -183,9 +183,17 @@ func (g *GP2Client) Connect(ctx context.Context, target *camerav1.Tartget) (adap
 		return nil, err
 	}
 	if err := resultToError(int(C.gp_camera_init(cam, g.ctx))); err != nil {
-		C.gp_camera_free(cam)
+		// 注意：gp_camera_free 会间接触发 ptp2 的 camera_exit，在 2.5.34 上
+		// 对于 PTP/IP 会调用 ptp_ptpip_disconnect() 并 close(jpgfd)，而
+		// 非富士相机的 jpgfd 恒为 0，可能误关进程 fd（含 gRPC socket）。
+		logFD0("connect:init_failed:before_free", "port_path", portPath, "model", model)
+		// gp_camera_free 会间接触发 ptp2 的 camera_exit；用 fd guard 防止
+		// libgphoto2 2.5.34 的 close(jpgfd=0) 误关进程 fd。
+		guardFD0(func() { C.gp_camera_free(cam) })
+		logFD0("connect:init_failed:after_free", "port_path", portPath, "model", model)
 		return nil, err
 	}
+	logFD0("connect:after_init", "port_path", portPath, "model", model)
 
 	driver := ""
 	if ab := (C.CameraAbilities{}); C.gp_camera_get_abilities(cam, &ab) == 0 {
@@ -507,13 +515,35 @@ func (s *GP2Camera) Close(ctx context.Context) error {
 	if s.cam == nil {
 		return nil
 	}
-	if err := resultToError(int(C.gp_camera_exit(s.cam, s.client.ctx))); err != nil {
+
+	// PTP/IP 断开时 libgphoto2 会释放相机自己的 socket；这里记录 fd 0
+	// 与进程打开 fd 集合的变化，用于确认是否被误关（尤其是 gRPC 的 fd）。
+	logFD0("close:before_exit",
+		"port_path", s.portPath, "driver", s.driver, "model", s.model)
+	beforeExit := openFDSet()
+
+	var exitErr error
+	// libgphoto2 2.5.34 的 ptp_ptpip_disconnect() 会 close(jpgfd=0)。
+	// guardFD0 让这次 close 落在临时的 /dev/null 上，并在结束后恢复原
+	// fd 0，避免 fd 0 被后续 gRPC accept 复用后再次被误关。
+	guardFD0(func() {
+		exitErr = resultToError(int(C.gp_camera_exit(s.cam, s.client.ctx)))
+		logFD0("close:after_exit",
+			"port_path", s.portPath, "driver", s.driver, "exit_err", exitErr)
+		warnIfFD0Closed("close:after_exit", "port_path", s.portPath, "driver", s.driver)
+		logFDDiff("close:exit", beforeExit, openFDSet())
+
+		beforeFree := openFDSet()
 		C.gp_camera_free(s.cam)
 		s.cam = nil
-		return err
+		logFD0("close:after_free", "port_path", s.portPath, "driver", s.driver)
+		warnIfFD0Closed("close:after_free", "port_path", s.portPath, "driver", s.driver)
+		logFDDiff("close:free", beforeFree, openFDSet())
+	})
+
+	if exitErr != nil {
+		return exitErr
 	}
-	C.gp_camera_free(s.cam)
-	s.cam = nil
 	return nil
 }
 

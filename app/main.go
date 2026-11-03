@@ -26,10 +26,28 @@ import (
 func main() {
 	// 根 ctx 由 SIGINT/SIGTERM 触发取消，贯穿服务初始化与服务运行，
 	// 使自动同步、下载任务等长生命周期协程随进程退出而终止。
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	//
+	// 这里不使用 signal.NotifyContext：它在第一次信号后只 cancel，不会恢复
+	// 默认处理，后续 Ctrl+C 会被吞掉。显式监听第二次信号，确保即使优雅
+	// 关闭被卡在 cgo 的相机操作里，也能强制退出。
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	vl, err := victorialogs.New("http://logs.home.arpa:9740")
+	sigCh := make(chan os.Signal, 2)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+
+	go func() {
+		sig := <-sigCh
+		slog.Info("shutdown signal received", "signal", sig.String())
+		cancel()
+
+		sig = <-sigCh
+		slog.Warn("second shutdown signal received, forcing exit", "signal", sig.String())
+		os.Exit(1)
+	}()
+
+	vl, err := victorialogs.New("http://logs.home.arpa:9428")
 	if err != nil {
 		panic(err)
 	}

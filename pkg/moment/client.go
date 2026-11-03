@@ -162,12 +162,19 @@ func (c *Client) Disconnect(ctx context.Context) error {
 	}
 
 	c.mu.Lock()
+	if c.refs > 0 {
+		slog.Debug("disconnect: waiting for in-flight operations", "refs", c.refs)
+	}
 	for c.refs > 0 {
 		c.idle.Wait()
 	}
 	c.session = nil
 	c.sessionCtx = nil
 	c.mu.Unlock()
+
+	if sess != nil {
+		slog.Debug("disconnecting camera", "port_path", sess.PortPath(), "driver", sess.Driver())
+	}
 
 	var closeErr error
 	if sess != nil {
@@ -188,14 +195,32 @@ func (c *Client) Disconnect(ctx context.Context) error {
 }
 
 // Close 断开连接并释放后端资源（若后端实现了 io.Closer）。
+//
+// Disconnect 内部获取 c.ops、等待在途租约时都无法被 ctx 中断，因此这里
+// 额外加一个硬超时：进程退出阶段不再无限等待卡在 cgo 里的相机操作。
+// 超时后刻意不调用 closeFn，避免在 cgo 仍使用 GPContext 时释放它。
 func (c *Client) Close() error {
 	if c == nil {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
-	_ = c.Disconnect(ctx)
+	slog.Debug("client close: disconnecting")
+	done := make(chan struct{})
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = c.Disconnect(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		slog.Debug("client close: disconnect completed")
+	case <-time.After(5 * time.Second):
+		slog.Warn("client close: timed out waiting for in-flight camera operations; " +
+			"skip backend close to avoid use-after-free")
+		return nil
+	}
 
 	if c.closeFn != nil {
 		return c.closeFn()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 
 	"ci.zevix.uk/moment-go/adapter"
@@ -130,25 +131,31 @@ func (b *Box) Close() error {
 		return nil
 	}
 
+	slog.Debug("box: closing")
 	if b.cancel != nil {
 		b.cancel()
 	}
 
 	var errs []error
 	if b.Client != nil {
+		slog.Debug("box: closing camera client")
 		if err := b.Client.Close(); err != nil {
 			errs = append(errs, err)
 		}
+		slog.Debug("box: camera client closed")
 	}
 	if b.store != nil {
+		slog.Debug("box: closing download store")
 		if err := b.store.Close(); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	if b.network != nil {
+		slog.Debug("box: closing network", "addr", b.network.Addr())
 		if err := b.network.Cleanup(); err != nil {
 			errs = append(errs, err)
 		}
 	}
+	slog.Debug("box: closed")
 	return errors.Join(errs...)
 }
